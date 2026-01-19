@@ -1,0 +1,57 @@
+import type { Locale } from '.'
+import type { KeyPrefix, Namespace } from './i18next-config'
+import { match } from '@formatjs/intl-localematcher'
+import { camelCase } from 'es-toolkit/compat'
+import { createInstance } from 'i18next'
+import resourcesToBackend from 'i18next-resources-to-backend'
+import Negotiator from 'negotiator'
+import { cookies, headers } from 'next/headers'
+import { initReactI18next } from 'react-i18next/initReactI18next'
+import { i18n } from '.'
+
+// https://locize.com/blog/next-13-app-dir-i18n/
+const initI18next = async (lng: Locale, ns: Namespace) => {
+  const i18nInstance = createInstance()
+  await i18nInstance
+    .use(initReactI18next)
+    .use(resourcesToBackend((language: Locale, namespace: Namespace) => import(`../i18n/${language}/${namespace}.ts`)))
+    .init({
+      lng: lng === 'zh-Hans' ? 'zh-Hans' : lng,
+      ns,
+      fallbackLng: 'en-US',
+    })
+  return i18nInstance
+}
+
+export async function getTranslation(lng: Locale, ns: Namespace) {
+  const i18nextInstance = await initI18next(lng, ns)
+  return {
+    t: i18nextInstance.getFixedT(lng, 'translation', camelCase(ns) as KeyPrefix),
+    i18n: i18nextInstance,
+  }
+}
+
+export const getLocaleOnServer = async (): Promise<Locale> => {
+  const locales: string[] = i18n.locales
+
+  let languages: string[] | undefined
+  // get locale from cookie
+  const localeCookie = (await cookies()).get('locale')
+  languages = localeCookie?.value ? [localeCookie.value] : []
+
+  if (!languages.length) {
+    // Negotiator expects plain object so we need to transform headers
+    const negotiatorHeaders: Record<string, string> = {};
+    (await headers()).forEach((value, key) => (negotiatorHeaders[key] = value))
+    // Use negotiator and intl-localematcher to get best locale
+    languages = new Negotiator({ headers: negotiatorHeaders }).languages()
+  }
+
+  // Validate languages
+  if (!Array.isArray(languages) || languages.length === 0 || !languages.every(lang => typeof lang === 'string' && /^[\w-]+$/.test(lang)))
+    languages = [i18n.defaultLocale]
+
+  // match locale
+  const matchedLocale = match(languages, locales, i18n.defaultLocale) as Locale
+  return matchedLocale
+}
