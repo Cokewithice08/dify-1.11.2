@@ -428,15 +428,15 @@ class ProviderConfiguration(BaseModel):
         return provider_names
 
     def edit_endpoint_url_http(self, credentials: dict) -> dict:
-        endpoint_url = credentials.get("endpoint_url", "")
-        if endpoint_url.startswith("https://baitong-ai.gree.com/openapi/cllm/"):
+        endpoint_url = credentials.get("endpoint_url")
+        if endpoint_url and endpoint_url.startswith("https://baitong-ai.gree.com/openapi/cllm/"):
             endpoint_url = endpoint_url.replace("https://", "http://", 1)
         credentials["endpoint_url"] = endpoint_url
         return credentials
 
     def editor_endpoint_url_https(self, credentials: dict) -> dict:
-        endpoint_url = credentials.get("endpoint_url", "")
-        if endpoint_url.startswith("http://baitong-ai.gree.com/openapi/cllm/"):
+        endpoint_url = credentials.get("endpoint_url")
+        if endpoint_url and endpoint_url.startswith("http://baitong-ai.gree.com/openapi/cllm/"):
             endpoint_url = endpoint_url.replace("http://", "https://", 1)
         credentials["endpoint_url"] = endpoint_url
         return credentials

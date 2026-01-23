@@ -232,6 +232,7 @@ class WorkflowToolProviderController(ToolProviderController):
         self.tools = [self._get_db_provider_tool(db_providers, app)]
 
         return self.tools
+
     def get_tools(self, tenant_id: str) -> list[WorkflowTool]:
         """
         fetch tools from database

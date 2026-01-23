@@ -3,7 +3,7 @@ import time
 from collections.abc import Sequence
 from typing import cast
 
-from controllers.common.context import get_content
+from controllers.common.context import get_content, ArgumentInfo
 from core.app.apps.base_app_queue_manager import AppQueueManager
 from core.app.apps.workflow.app_config_manager import WorkflowAppConfig
 from core.app.apps.workflow_app_runner import WorkflowBasedAppRunner

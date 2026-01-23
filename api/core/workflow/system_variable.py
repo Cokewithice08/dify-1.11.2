@@ -53,6 +53,9 @@ class SystemVariable(BaseModel):
     datasource_type: str | None = None
     datasource_info: Mapping[str, Any] | None = None
     invoke_from: str | None = None
+    gree_mail: str | None = None
+    gree_token: str | None = None
+    argument: str | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -112,6 +115,12 @@ class SystemVariable(BaseModel):
             d[SystemVariableKey.INVOKE_FROM] = self.invoke_from
         if self.timestamp is not None:
             d[SystemVariableKey.TIMESTAMP] = self.timestamp
+        if self.gree_mail is not None:
+            d[SystemVariableKey.GREE_MAIL] = self.gree_mail
+        if self.gree_token is not None:
+            d[SystemVariableKey.GREE_TOKEN] = self.gree_token
+        if self.argument is not None:
+            d[SystemVariableKey.ARGUMENT] = self.argument
         return d
 
     def as_view(self) -> "SystemVariableReadOnlyView":

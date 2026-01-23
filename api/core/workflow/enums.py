@@ -31,6 +31,9 @@ class SystemVariableKey(StrEnum):
     DATASOURCE_TYPE = "datasource_type"
     DATASOURCE_INFO = "datasource_info"
     INVOKE_FROM = "invoke_from"
+    GREE_MAIL = "gree_mail"
+    GREE_TOKEN = "gree_token"
+    ARGUMENT = "argument"
 
 
 class NodeType(StrEnum):

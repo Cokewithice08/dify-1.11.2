@@ -57,7 +57,7 @@ export default function AccountAbout({
               LangGenius, Inc., Contributors.
             </div>
             <div className="text-text-accent">
-              {
+              {/* {
                 IS_CE_EDITION
                   ? <Link href="https://github.com/langgenius/dify/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Open Source License</Link>
                   : (
@@ -67,7 +67,7 @@ export default function AccountAbout({
                         <Link href="https://dify.ai/terms" target="_blank" rel="noopener noreferrer">Terms of Service</Link>
                       </>
                     )
-              }
+              } */}
             </div>
           </div>
         </div>
