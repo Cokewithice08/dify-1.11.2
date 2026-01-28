@@ -656,7 +656,7 @@ const TextGeneration: FC<IMainProps> = ({
           )}
         </div>
         {/* powered by */}
-        {!customConfig?.remove_webapp_brand && (
+        {/* {!customConfig?.remove_webapp_brand && (
           <div className={cn(
             'flex shrink-0 items-center gap-1.5 bg-components-panel-bg py-3',
             isPC ? 'px-8' : 'px-4',
@@ -672,7 +672,7 @@ const TextGeneration: FC<IMainProps> = ({
                   : <DifyLogo size="small" />
             }
           </div>
-        )}
+        )} */}
       </div>
       {/* Result */}
       <div className={cn(

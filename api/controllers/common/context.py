@@ -1,6 +1,6 @@
 import contextvars
 from typing import Optional
-
+import logging
 from pydantic import BaseModel, Field
 from flask import request
 
@@ -12,6 +12,8 @@ from services.gree_sso import get_user_info, get_redis_key, UserInfo
 from models.account import (
     Account
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ArgumentInfo(BaseModel):
@@ -107,7 +109,6 @@ def get_content() -> ArgumentInfo:
 
     if info.gree_token:
         user_info = get_user_info(info.gree_token)
-
     if not user_info:
         info.gree_token = extract_gree_token_from_cookie(request)
         user_info = get_user_info(info.gree_token)
@@ -154,5 +155,6 @@ def get_gree_mail_by_ip() -> str:
         ip = forwarded_ip.split(',')[0].split()
     email = db.session.query(Account.email).filter_by(last_login_ip=ip).first()
     if email:
-        result = email.split("@")[0]
+        email_str = email[0]
+        result = email_str.split("@")[0]
         return result

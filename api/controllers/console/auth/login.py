@@ -1,3 +1,5 @@
+from typing import Optional
+
 import flask_login
 from flask import make_response, request, redirect
 from flask_restx import Resource
@@ -47,7 +49,7 @@ from services.errors.account import AccountRegisterError, RoleNotWorkSpaceError
 from services.errors.workspace import WorkSpaceNotAllowedCreateError, WorkspacesLimitExceededError
 from services.feature_service import FeatureService
 from services.gree_organization_service import WorkspaceAdmin, GreeOrganizationService
-from services.gree_sso import GreeSsoService
+from services.gree_sso import GreeSsoService, GreeAppConversationService, GreeAppMessageService
 
 DEFAULT_REF_TEMPLATE_SWAGGER_2_0 = "#/definitions/{model}"
 
@@ -67,6 +69,28 @@ class LoginGreeSSOPayload(BaseModel):
 
 class CreateWorkspacePayload(BaseModel):
     workspace_param: list = Field(..., description="Workspace object")
+
+
+# 添加的conversation查询
+class GreeAppConversationPayload(BaseModel):
+    page_number: Optional[int] = Field(description="Page number", default=1)
+    page_size: Optional[int] = Field(description="Page size", default=10)
+    app_id: Optional[str] = Field(description="Gree_App id", default=None)
+    start_date: Optional[str] = Field(description="Start date", default=None)
+    end_date: Optional[str] = Field(description="End date", default=None)
+    create_sort: Optional[str] = Field(description="Create sort", default=None)
+    user_id: Optional[str] = Field(description="user account id", default=None)
+
+
+# 添加的message查询参数
+class GreeAppMessagePayload(BaseModel):
+    page_number: Optional[int] = Field(description="Page number", default=1)
+    page_size: Optional[int] = Field(description="Page size", default=100)
+    app_id: Optional[str] = Field(description="Gree_App id", default=None)
+    start_date: Optional[str] = Field(description="Start date", default=None)
+    end_date: Optional[str] = Field(description="End date", default=None)
+    user_id: Optional[str] = Field(description="user account id", default=None)
+    conversation_id: Optional[str] = Field(description="conversation id", default=None)
 
 
 class EmailPayload(BaseModel):
@@ -256,6 +280,43 @@ class GreeCreateWorkspaceByAdminApi(Resource):
             workspace_list.append(workspace_admin)
         GreeOrganizationService.create_workspace_admin(workspace_list)
         return {"result": "success"}
+
+
+# 分页获取conversation
+@console_ns.route("/gree/app/conversation")
+class GreeConversationApi(Resource):
+    @setup_required
+    def post(self):
+        raw_params = request.get_json() or {}
+        args_model = GreeAppConversationPayload.model_validate(raw_params, strict=False)
+        args = args_model.model_dump(exclude_none=False)
+        conversation_list, total = GreeAppConversationService.get_gree_app_conversations(args["page_number"],
+                                                                                         args["page_size"],
+                                                                                         args["app_id"],
+                                                                                         args["start_date"],
+                                                                                         args["end_date"],
+                                                                                         args["user_id"],
+                                                                                         args["create_sort"])
+        return {"data": conversation_list, "total": total}
+
+
+#  分页获取message并message
+@console_ns.route("/gree/app/message")
+class GreeMessageApi(Resource):
+    @setup_required
+    def post(self):
+        raw_params = request.get_json() or {}
+        args_model = GreeAppMessagePayload.model_validate(raw_params, strict=False)
+        args = args_model.model_dump(exclude_none=False)
+        message_list, total = GreeAppMessageService.get_gree_app_messages(args["page_number"],
+                                                                          args["page_size"],
+                                                                          args["app_id"],
+                                                                          args["start_date"],
+                                                                          args["end_date"],
+                                                                          args["user_id"],
+                                                                          args["conversation_id"])
+        return {"data": message_list, "total": total}
+
 
 
 # @console_ns.route("/gree_create_public_key")

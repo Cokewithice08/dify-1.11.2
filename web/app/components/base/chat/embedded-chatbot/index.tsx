@@ -1,7 +1,9 @@
 'use client'
 import {
   useEffect,
+  useState,
 } from 'react'
+import Cookies from 'js-cookie'
 import { useTranslation } from 'react-i18next'
 import ChatWrapper from '@/app/components/base/chat/embedded-chatbot/chat-wrapper'
 import Header from '@/app/components/base/chat/embedded-chatbot/header'
@@ -20,6 +22,7 @@ import { useEmbeddedChatbot } from './hooks'
 import { useThemeContext } from './theme/theme-context'
 import { CssTransform } from './theme/utils'
 import { isDify } from './utils'
+import GreeSSO from '@/app/components/base/chat/chat-with-history/sidebar/gree-sso'
 
 const Chatbot = () => {
   const {
@@ -33,7 +36,53 @@ const Chatbot = () => {
   } = useEmbeddedChatbotContext()
   const { t } = useTranslation()
   const systemFeatures = useGlobalPublicStore(s => s.systemFeatures)
+  const [showGreeSSO, setShowGreeSSO] = useState(false)
+  
+  // 步骤1：解析 URL 参数
+  const urlsearchParams = new URLSearchParams(window.location.search)
+  const greeMail = urlsearchParams.get('gree_mail')
+  const greeToken = urlsearchParams.get('gree_token')
+  const pathname = window.location.pathname
+  const origin = window.location.origin
 
+  if (greeMail && greeToken) {
+    // localStorage.setItem('gree_mail', greeMail)
+    // localStorage.setItem('gree_token', greeToken)
+    Cookies.set("gree_mail",greeMail,{
+      path: '/',
+      expires: 30,         // 30 天
+      secure: true,
+      sameSite: 'Lax'
+    })
+      
+    Cookies.set("gree_token",greeToken,{
+        path: '/',
+        expires: 30,         // 30 天
+        secure: true,
+        sameSite: 'Lax'
+      })
+      
+    Cookies.set("argument","Please set the argument in the cookies.",{
+          path: '/',
+          expires: 30,         // 30 天
+          secure: true,
+          sameSite: 'Lax'
+      })
+      
+    window.history.replaceState({}, '', pathname)
+  }
+  // const gree_mail = localStorage.getItem('gree_mail')
+  
+  useEffect(() => {
+    // const gree_token = localStorage.getItem('gree_token')
+    const gree_mail = Cookies.get('gree_mail')
+    const gree_token = Cookies.get('gree_token')
+    const argument = Cookies.get('argument')
+  
+    if (!gree_token) {
+      setShowGreeSSO(true);
+    }
+  }, [])
   const customConfig = appData?.custom_config
   const site = appData?.site
 
@@ -70,6 +119,9 @@ const Chatbot = () => {
             <ChatWrapper key={chatShouldReloadKey} />
           )}
         </div>
+      </div>
+      <div>
+        {showGreeSSO && <GreeSSO openid='' sourceUrl={pathname}></GreeSSO>}
       </div>
       {/* powered by */}
       {isMobile && (

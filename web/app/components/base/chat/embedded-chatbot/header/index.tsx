@@ -85,7 +85,7 @@ const Header: FC<IHeaderProps> = ({
       <div className="flex h-14 shrink-0 items-center justify-end p-3">
         <div className="flex items-center gap-1">
           {/* powered by */}
-          <div className="shrink-0">
+          {/* <div className="shrink-0">
             {!appData?.custom_config?.remove_webapp_brand && (
               <div className={cn(
                 'flex shrink-0 items-center gap-1.5 px-2',
@@ -101,7 +101,7 @@ const Header: FC<IHeaderProps> = ({
                 }
               </div>
             )}
-          </div>
+          </div> */}
           {currentConversationId && (
             <Divider type="vertical" className="h-3.5" />
           )}
