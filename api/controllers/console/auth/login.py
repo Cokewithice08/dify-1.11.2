@@ -44,12 +44,13 @@ from libs.token import (
     clear_gree_mail_from_cookie, set_gree_token_to_cookie, set_gree_mail_to_cookie, set_gree_argument_to_cookie,
 )
 from services.account_service import AccountService, RegisterService, TenantService
+from services.app_dsl_service import AppDslService
 from services.billing_service import BillingService
 from services.errors.account import AccountRegisterError, RoleNotWorkSpaceError
 from services.errors.workspace import WorkSpaceNotAllowedCreateError, WorkspacesLimitExceededError
 from services.feature_service import FeatureService
 from services.gree_organization_service import WorkspaceAdmin, GreeOrganizationService
-from services.gree_sso import GreeSsoService, GreeAppConversationService, GreeAppMessageService
+from services.gree_sso import GreeSsoService, GreeAppConversationService, GreeAppMessageService, GreeGitServer
 
 DEFAULT_REF_TEMPLATE_SWAGGER_2_0 = "#/definitions/{model}"
 
@@ -282,26 +283,8 @@ class GreeCreateWorkspaceByAdminApi(Resource):
         return {"result": "success"}
 
 
-# 分页获取conversation
-@console_ns.route("/gree/app/conversation")
-class GreeConversationApi(Resource):
-    @setup_required
-    def post(self):
-        raw_params = request.get_json() or {}
-        args_model = GreeAppConversationPayload.model_validate(raw_params, strict=False)
-        args = args_model.model_dump(exclude_none=False)
-        conversation_list, total = GreeAppConversationService.get_gree_app_conversations(args["page_number"],
-                                                                                         args["page_size"],
-                                                                                         args["app_id"],
-                                                                                         args["start_date"],
-                                                                                         args["end_date"],
-                                                                                         args["user_id"],
-                                                                                         args["create_sort"])
-        return {"data": conversation_list, "total": total}
-
-
 #  分页获取message并message
-@console_ns.route("/gree/app/message")
+@console_ns.route("/gree/app/conversations")
 class GreeMessageApi(Resource):
     @setup_required
     def post(self):
@@ -318,6 +301,21 @@ class GreeMessageApi(Resource):
         return {"data": message_list, "total": total}
 
 
+@console_ns.route("/gree/app/conversations/tree")
+class GreeMessageApi(Resource):
+    @setup_required
+    def post(self):
+        raw_params = request.get_json() or {}
+        args_model = GreeAppMessagePayload.model_validate(raw_params, strict=False)
+        args = args_model.model_dump(exclude_none=False)
+        message_list, total = GreeAppMessageService.get_gree_app_messages_tree(args["page_number"],
+                                                                          args["page_size"],
+                                                                          args["app_id"],
+                                                                          args["start_date"],
+                                                                          args["end_date"],
+                                                                          args["user_id"],
+                                                                          args["conversation_id"])
+        return {"data": message_list, "total": total}
 
 # @console_ns.route("/gree_create_public_key")
 # class GreeCreateWorkspaceByAdminApi(Resource):

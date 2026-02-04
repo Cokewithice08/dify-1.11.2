@@ -8,16 +8,20 @@ from werkzeug.exceptions import NotFound, Unauthorized
 
 from configs import dify_config
 from constants import HEADER_NAME_APP_CODE
+from controllers.common.context import get_account_id_by_content
 from controllers.web import web_ns
 from controllers.web.error import WebAppAuthRequiredError
+from core.errors.error import GreeTokenExpiredError
 from extensions.ext_database import db
 from libs.passport import PassportService
 from libs.token import extract_webapp_access_token
+from models import Account
 from models.model import App, EndUser, Site
 from services.feature_service import FeatureService
 from services.webapp_auth_service import WebAppAuthService, WebAppAuthType
 
 
+#  全部改成gree account 账号登录不使用游客登录了
 @web_ns.route("/passport")
 class PassportResource(Resource):
     """Base resource for passport."""
@@ -57,11 +61,20 @@ class PassportResource(Resource):
         if not app_model or app_model.status != "normal" or not app_model.enable_site:
             raise NotFound()
 
+        # 自己写的代码逻辑
+        # if user_id:
+        #     account_user = db.session.scalar(
+        #         select(Account).where(Account.id == user_id)
+        #     )
+        #     if not account_user:
+        #         raise GreeTokenExpiredError(f"该user_id找不到用户信息，请联系管理员")
+        # else:
+        #     user_id = get_account_id_by_content()
+         # 原本的逻辑
         if user_id:
             end_user = db.session.scalar(
                 select(EndUser).where(EndUser.app_id == app_model.id, EndUser.session_id == user_id)
             )
-
             if end_user:
                 pass
             else:
@@ -197,6 +210,19 @@ def exchange_token_for_existing_web_user(app_code: str, enterprise_user_decoded:
 def _exchange_for_public_app_token(app_model, site, token_decoded):
     user_id = token_decoded.get("user_id")
     end_user = None
+
+    # # 自己写的代码逻辑
+    # if user_id:
+    #     account_user = db.session.scalar(
+    #         select(Account).where(Account.id == user_id)
+    #     )
+    #     if not account_user:
+    #         raise GreeTokenExpiredError(f"该user_id找不到用户信息，请联系管理员")
+    # else:
+    #     user_id = get_account_id_by_content()
+
+    #  原本的逻辑
+
     if user_id:
         end_user = db.session.scalar(
             select(EndUser).where(EndUser.app_id == app_model.id, EndUser.session_id == user_id)

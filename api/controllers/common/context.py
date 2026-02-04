@@ -3,10 +3,11 @@ from typing import Optional
 import logging
 from pydantic import BaseModel, Field
 from flask import request
+from sqlalchemy import func, select
 
 from core.errors.error import GreeTokenExpiredError
 from extensions.ext_redis import redis_client
-from libs.token import extract_gree_token_from_cookie
+from libs.token import extract_gree_token_from_cookie, extract_gree_mail_from_cookie
 from models.engine import db
 from services.gree_sso import get_user_info, get_redis_key, UserInfo
 from models.account import (
@@ -144,6 +145,16 @@ def get_redis_user_info(db_mail) -> Optional[UserInfo]:
         return None
 
 
+def get_account_id_by_gree_mail(gree_mail: str) -> Optional[str]:
+    if not gree_mail:
+        return None
+    email = gree_mail + '@it2004.gree.com.cn'
+    user_id = str(db.session.scalar(
+        select(Account.id).where(Account.email == email)
+    ))
+    return user_id
+
+
 #         首先要去cookie中获取这些参数，没有的情况下采取通过ip绑定查询
 
 
@@ -153,8 +164,54 @@ def get_gree_mail_by_ip() -> str:
     forwarded_ip = request.headers.get('X-Forwarded-For')
     if forwarded_ip:
         ip = forwarded_ip.split(',')[0].split()
-    email = db.session.query(Account.email).filter_by(last_login_ip=ip).first()
+    email = str(db.session.query(Account.email).filter_by(last_login_ip=ip).first())
     if email:
         email_str = email[0]
         result = email_str.split("@")[0]
         return result
+
+
+#  获取account_id 通过ip
+def get_account_id_by_ip() -> str | None:
+    ip = request.remote_addr
+    forwarded_ip = request.headers.get('X-Forwarded-For')
+    if forwarded_ip:
+        ip = forwarded_ip.split(',')[0].split()
+    user_id = str(db.session.query(Account.id).filter_by(last_login_ip=ip).first())
+    return user_id
+
+
+# 根据传入的context上下文信息获取登录的账号信息（为什么不直接查数据库，防止gree token过期）
+def get_account_by_context() -> Account:
+    argument_info = get_content()
+    if argument_info.gree_mail not in ("", None):
+        email = argument_info.gree_mail
+        account = db.session.query(Account).filter_by(email=email).first()
+        if account:
+            return account
+        else:
+            raise GreeTokenExpiredError(f"用户信息过期，请重新登录")
+    else:
+        raise GreeTokenExpiredError(f"用户信息过期，请重新登录")
+
+
+#  获取用户的user_id信息
+def get_account_id_by_content() -> str | None:
+    try:
+        info = request_context.get()
+    except LookupError:
+        info = ArgumentInfo()
+
+    user_id: Optional[str] = None
+
+    if info.gree_mail:
+        user_id = get_account_id_by_gree_mail(info.gree_mail)
+    if not user_id:
+        info.gree_mail = extract_gree_mail_from_cookie(request)
+        user_id = get_account_id_by_gree_mail(info.gree_mail)
+
+    if not user_id:
+        user_id = get_account_id_by_ip()
+        if not user_id:
+            raise GreeTokenExpiredError(f"用户信息过期，请重新登录")
+    return user_id

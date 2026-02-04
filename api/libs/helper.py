@@ -24,6 +24,7 @@ from core.app.features.rate_limiting.rate_limit import RateLimitGenerator
 from core.file import helpers as file_helpers
 from core.model_runtime.utils.encoders import jsonable_encoder
 from extensions.ext_redis import redis_client
+from services.gree_tenant_account_service import GreeTenantAccountService
 
 if TYPE_CHECKING:
     from models import Account
@@ -49,7 +50,12 @@ def extract_tenant_id(user: Union["Account", "EndUser"]) -> str | None:
     from models.model import EndUser
 
     if isinstance(user, Account):
+        # gree 账号登录
         return user.current_tenant_id
+        # tenant_id = user.current_tenant_id
+        # if tenant_id is None:
+        #     tenant_id = GreeTenantAccountService.get_current_tenant_id(user)
+        # return tenant_id
     elif isinstance(user, EndUser):
         return user.tenant_id
     else:

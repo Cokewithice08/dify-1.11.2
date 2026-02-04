@@ -56,9 +56,9 @@ class ChatMessagePayload(BaseModel):
     conversation_id: str | None = None
     parent_message_id: str | None = None
     retriever_from: str = Field(default="explore_app")
-    gree_mail: str | None = None
-    gree_token: str | None = None
-    argument: str | None = None
+    gree_mail: str = Field(default="")
+    gree_token: str = Field(default="")
+    argument: str = Field(default="")
 
     @field_validator("conversation_id", "parent_message_id", mode="before")
     @classmethod

@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
@@ -14,6 +15,7 @@ from controllers.web.error import WebAppAuthAccessDeniedError, WebAppAuthRequire
 from extensions.ext_database import db
 from libs.passport import PassportService
 from libs.token import extract_webapp_passport
+from models import Account
 from models.model import App, EndUser, Site
 from services.app_service import AppService
 from services.enterprise.enterprise_service import EnterpriseService, WebAppSettings
@@ -25,7 +27,9 @@ R = TypeVar("R")
 
 
 def validate_jwt_token(view: Callable[Concatenate[App, EndUser, P], R] | None = None):
+    #  gree 登录账户
     def decorator(view: Callable[Concatenate[App, EndUser, P], R]):
+        # def decorator(view: Callable[Concatenate[App, EndUser, P], R]):
         @wraps(view)
         def decorated(*args: P.args, **kwargs: P.kwargs):
             app_model, end_user = decode_jwt_token()
@@ -59,7 +63,11 @@ def decode_jwt_token(app_code: str | None = None, user_id: str | None = None):
             if app_model.enable_site is False:
                 raise BadRequest("Site is disabled.")
             end_user_id = decoded.get("end_user_id")
+            #  gree 登录账号
             end_user = session.scalar(select(EndUser).where(EndUser.id == end_user_id))
+            # account_user = session.scalar(select(Account).where(Account.id == end_user_id))
+            # if not account_user:
+            #     raise NotFound()
             if not end_user:
                 raise NotFound()
 
@@ -83,6 +91,7 @@ def decode_jwt_token(app_code: str | None = None, user_id: str | None = None):
         )
 
         return app_model, end_user
+        # return app_model, account_user
     except Unauthorized as e:
         if system_features.webapp_auth.enabled:
             if not app_code:

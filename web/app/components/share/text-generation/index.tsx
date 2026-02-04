@@ -655,6 +655,9 @@ const TextGeneration: FC<IMainProps> = ({
             />
           )}
         </div>
+        <div>
+          {showGreeSSO && <GreeSSO openid='' sourceUrl={pathname}></GreeSSO>}
+        </div>
         {/* powered by */}
         {/* {!customConfig?.remove_webapp_brand && (
           <div className={cn(

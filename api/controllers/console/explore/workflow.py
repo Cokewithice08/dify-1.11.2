@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from werkzeug.exceptions import InternalServerError
 
 from controllers.common.schema import register_schema_model
@@ -38,10 +38,9 @@ logger = logging.getLogger(__name__)
 class WorkflowRunPayload(BaseModel):
     inputs: dict[str, Any]
     files: list[dict[str, Any]] | None = None
-    gree_mail: str | None = None
-    gree_token: str | None = None
-    argument: str | None = None
-
+    gree_mail: str = Field(default="")
+    gree_token: str = Field(default="")
+    argument: str = Field(default="")
 
 
 register_schema_model(console_ns, WorkflowRunPayload)

@@ -90,6 +90,11 @@ def extract_gree_token_from_cookie(request: Request) -> str | None:
     return request.cookies.get(COOKIE_NAME_GREE_TOKEN)
 
 
+# 在cookie中获取gree_mail
+def extract_gree_mail_from_cookie(request: Request) -> str | None:
+    return request.cookies.get(COOKIE_NAME_GREE_MAIL)
+
+
 def extract_webapp_access_token(request: Request) -> str | None:
     return request.cookies.get(_real_cookie_name(COOKIE_NAME_WEBAPP_ACCESS_TOKEN)) or _try_extract_from_header(request)
 

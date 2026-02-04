@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from werkzeug.exceptions import InternalServerError, NotFound
 
 import services
-from controllers.common.context import set_content
+from controllers.common.context import set_content, get_account_by_context
 from controllers.common.schema import register_schema_models
 from controllers.web import web_ns
 from controllers.web.error import (
@@ -29,6 +29,7 @@ from core.errors.error import (
 from core.model_runtime.errors.invoke import InvokeError
 from libs import helper
 from libs.helper import uuid_value
+from models import Account
 from models.model import AppMode
 from services.app_generate_service import AppGenerateService
 from services.app_task_service import AppTaskService
@@ -57,9 +58,9 @@ class ChatMessagePayload(BaseModel):
     conversation_id: str | None = Field(default=None, description="Conversation ID")
     parent_message_id: str | None = Field(default=None, description="Parent message ID")
     retriever_from: str = Field(default="web_app", description="Source of retriever")
-    gree_mail: str | None = None
-    gree_token: str | None = None
-    argument: str | None = None
+    gree_mail: str = Field(default="")
+    gree_token: str = Field(default="")
+    argument: str = Field(default="")
 
     @field_validator("conversation_id", "parent_message_id")
     @classmethod
@@ -181,7 +182,6 @@ class ChatApi(WebApiResource):
         streaming = payload.response_mode == "streaming"
         args["auto_generate_name"] = False
         set_content(args["gree_mail"], args["gree_token"], args["argument"])
-
         try:
             response = AppGenerateService.generate(
                 app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.WEB_APP, streaming=streaming

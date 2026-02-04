@@ -27,6 +27,7 @@ from fields.message_fields import agent_thought_fields, feedback_fields, retriev
 from fields.raws import FilesContainedField
 from libs import helper
 from libs.helper import TimestampField, uuid_value
+from models import Account
 from models.model import AppMode
 from services.app_generate_service import AppGenerateService
 from services.errors.app import MoreLikeThisDisabledError

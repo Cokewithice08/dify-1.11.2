@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 import models
 
+
 from .account_service import AccountService, RegisterService, TenantService
 
 
@@ -61,3 +62,4 @@ class GreeOrganizationService:
         if param:
             for workspace_admin in param:
                 create_workspace(workspace_admin)
+

@@ -1,7 +1,11 @@
 import json
 import logging
+import shutil
+import subprocess
 from datetime import datetime
 from decimal import Decimal
+from operator import and_
+from pathlib import Path
 
 import requests
 from flask import request
@@ -11,7 +15,7 @@ from core.errors.error import GreeTokenExpiredError
 from libs.helper import extract_remote_ip
 import models
 from extensions.ext_redis import redis_client
-from models import Conversation, Message
+from models import Conversation, Message, TenantAccountJoin, EndUser
 from models.engine import db
 from sqlalchemy import func
 from sqlalchemy.orm import Query
@@ -128,7 +132,7 @@ def get_user_info(token: str) -> UserInfo | None:
     if response.status_code == 200:
         json_data = response.json()
         user_info = UserInfo(**json_data)
-        logging.exception(json_data)
+        # logging.exception(json_data)
         user_info.user_id = ''
         if 'Success' in json_data and user_info.Success:
             return user_info
@@ -371,6 +375,15 @@ class GreeSsoService:
         else:
             return response.json()
 
+    @staticmethod
+    def get_tenant_id_by_account_id(account_id: str) -> str | None:
+        if account_id:
+            tenant_account_id = (db.session.query(TenantAccountJoin.tenant_id)
+                                 .filter_by(account_id=account_id)
+                                 .filter_by(role='owner').first())
+            return tenant_account_id
+        return None
+
 
 # 根据条件获取conversation
 class GreeAppConversationService:
@@ -422,8 +435,7 @@ class GreeAppConversationService:
                 # 处理空值（统一转为None，避免JSON序列化问题）
                 elif value in ("NULL", "", None):
                     conv_dict[key] = None
-
-        conversation_list.append(conv_dict)
+            conversation_list.append(conv_dict)
         return conversation_list, total
 
 
@@ -440,7 +452,29 @@ class GreeAppMessageService:
         user_id: str | None = None,
         conversation_id: str | None = None,
     ) -> tuple[list, int]:
+        # ==================== 动态子查询构建（核心改造） ====================
+        # 初始化子查询基础查询（仅选EndUser.id，未加过滤条件）
+        sub_query_base = db.session.query(EndUser.id)
+
+        # 动态拼接子查询过滤条件：根据user_id是否为空分支处理
+        if user_id:
+            # 分支1：user_id不为空 → 精准匹配 EndUser.external_user_id = user_id
+            sub_query_base = sub_query_base.filter(EndUser.external_user_id == user_id)
+        else:
+            # 分支2：user_id为空 → 保留原逻辑：模糊匹配域名 + 排除指定用户
+            sub_query_base = sub_query_base.filter(
+                and_(
+                    EndUser.external_user_id.like('%@it2004.gree.com.cn'),
+                    EndUser.external_user_id != '180075@it2004.gree.com.cn'
+                )
+            )
+
+        # 统一执行group_by并转为子查询（所有分支共用，保证子查询格式一致）
+        sub_query = sub_query_base.group_by(EndUser.id)
+        # ==================== 2. 主查询初始化 + 子查询过滤（核心：IN条件） ====================
         query: Query = db.session.query(Message)
+        # 应用子查询过滤：ms.from_end_user_id in (子查询)
+        query = query.filter(Message.from_end_user_id.in_(sub_query))
         filter_conditions = []
         if app_id:
             filter_conditions.append(Message.app_id == app_id)
@@ -450,8 +484,6 @@ class GreeAppMessageService:
             filter_conditions.append(Message.created_at >= start_date)
         if end_date:
             filter_conditions.append(Message.created_at <= end_date)
-        if user_id:
-            filter_conditions.append(Message.from_account_id == user_id)
         # 应用过滤条件
         if filter_conditions:
             query = query.filter(*filter_conditions)
@@ -460,7 +492,61 @@ class GreeAppMessageService:
         page_number = max(int(page_number), 1)
         page_size = min(int(page_size), 100)  # 限制最大页大小为100
         offset = (page_number - 1) * page_size
+        # 4. 查询分页数据并转换为字典
+        message_model_list = query.offset(offset).limit(page_size).all()
+        message_list = [msg.to_dict() for msg in message_model_list] if message_model_list else []
+        return message_list, total
 
+    @staticmethod
+    def get_gree_app_messages_tree(
+        page_number: int,
+        page_size: int,
+        app_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        user_id: str | None = None,
+        conversation_id: str | None = None,
+    ) -> tuple[list, int]:
+        # ==================== 动态子查询构建（核心改造） ====================
+        # 初始化子查询基础查询（仅选EndUser.id，未加过滤条件）
+        sub_query_base = db.session.query(EndUser.id)
+
+        # 动态拼接子查询过滤条件：根据user_id是否为空分支处理
+        if user_id:
+            # 分支1：user_id不为空 → 精准匹配 EndUser.external_user_id = user_id
+            sub_query_base = sub_query_base.filter(EndUser.external_user_id == user_id)
+        else:
+            # 分支2：user_id为空 → 保留原逻辑：模糊匹配域名 + 排除指定用户
+            sub_query_base = sub_query_base.filter(
+                and_(
+                    EndUser.external_user_id.like('%@it2004.gree.com.cn'),
+                    EndUser.external_user_id != '180075@it2004.gree.com.cn'
+                )
+            )
+
+        # 统一执行group_by并转为子查询（所有分支共用，保证子查询格式一致）
+        sub_query = sub_query_base.group_by(EndUser.id)
+        # ==================== 2. 主查询初始化 + 子查询过滤（核心：IN条件） ====================
+        query: Query = db.session.query(Message)
+        # 应用子查询过滤：ms.from_end_user_id in (子查询)
+        query = query.filter(Message.from_end_user_id.in_(sub_query))
+        filter_conditions = []
+        if app_id:
+            filter_conditions.append(Message.app_id == app_id)
+        if conversation_id:
+            filter_conditions.append(Message.conversation_id == conversation_id)
+        if start_date:
+            filter_conditions.append(Message.created_at >= start_date)
+        if end_date:
+            filter_conditions.append(Message.created_at <= end_date)
+        # 应用过滤条件
+        if filter_conditions:
+            query = query.filter(*filter_conditions)
+        # 2. 优化总记录数查询（避免全表扫描）
+        total = query.with_entities(func.count(Message.id)).scalar() or 0
+        page_number = max(int(page_number), 1)
+        page_size = min(int(page_size), 100)  # 限制最大页大小为100
+        offset = (page_number - 1) * page_size
         # 4. 查询分页数据并转换为字典
         message_list = query.offset(offset).limit(page_size).all()
         result_list = []
@@ -522,3 +608,71 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj
         # 其他类型默认处理
         return super().default(obj)
+
+
+#  上传机制
+
+#  封装git 函数
+def execute_gree_git_command(cmd_list, work_dir):
+    try:
+        result = subprocess.run(
+            cmd_list,
+            cwd=work_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            check=True,
+            encoding="utf-8",
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        err_msg = e.stderr.strip() if e.stderr.strip() else "无具体错误信息，可能是命令参数格式错误"
+        raise Exception(f"git command failed: {''.join(cmd_list)} | 错误信息：{err_msg}")
+    except Exception as e:
+        raise Exception(f"命令执行一场：{' '.join(cmd_list)} | 异常信息：{str(e)}")
+
+
+class GreeGitServer:
+
+    @staticmethod
+    def push_file_to_git(
+        git_push_path: Path,
+        commit_msg: str = 'feat: 自动推送发布的dify应用到git 仓库'
+    ):
+        """
+        适配YML文件已在.git仓库目录下的场景，仅精准推送指定单个文件
+        :param git_push_path: 待上传文件的精准路劲
+        """
+
+        file_path = git_push_path.absolute()
+
+        if not file_path.is_file():
+            raise FileNotFoundError(f"待上传文件不存在,请检查路径：{file_path}")
+
+        #         构造仓库内目标文件路经，自动创建多级目录
+        repo_path = None
+        # 从文件所在目录向上遍历，直到根目录
+        for parent in file_path.parents:
+            if (parent / ".git").is_dir():
+                repo_path = parent
+                break
+        # 校验：是否找到有效Git仓库（文件不在任何.git仓库内则抛出异常）
+        if repo_path is None:
+            raise NotADirectoryError(f"待推送文件未在任何Git仓库内（未找到.git文件夹）：{file_path}")
+        logging.info(f"✅ 自动解析到Git仓库根目录：{repo_path}")
+
+        # 4. 计算文件在Git仓库内的相对路径（Git命令必备，避免绝对路径报错）
+        repo_relative_file = file_path.relative_to(repo_path)
+
+        # 执行Git命令（均为列表格式，无任何参数报错）
+        # 1. 添加文件到暂存区
+        execute_gree_git_command(['git', 'add', str(repo_relative_file)], repo_path)
+        logging.info(f"✅ Git添加成功：{repo_relative_file}")
+
+        # 2. 提交文件到本地仓库
+        execute_gree_git_command(['git', 'commit', '-m', commit_msg], repo_path)
+        logging.info(f"✅ Git提交成功：{commit_msg}")
+
+        # 3. 推送到远程仓库（Gogs默认master分支，指定分支则写['git', 'push', 'origin', 'master']）
+        execute_gree_git_command(['git', 'push', '-u', 'origin', 'master'], repo_path)
+        logging.info(f"✅ 成功推送到远程仓库！目标路径：{repo_relative_file}")

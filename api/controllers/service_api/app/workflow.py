@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, sessionmaker
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
-from controllers.common.context import set_content
+from controllers.common.context import set_content, get_account_by_context
 from controllers.common.schema import register_schema_models
 from controllers.service_api import service_api_ns
 from controllers.service_api.app.error import (
@@ -49,9 +49,9 @@ class WorkflowRunPayload(BaseModel):
     inputs: dict[str, Any]
     files: list[dict[str, Any]] | None = None
     response_mode: Literal["blocking", "streaming"] | None = None
-    gree_mail: str | None = None
-    gree_token: str | None = None
-    argument: str | None = None
+    gree_mail: str = Field(default="")
+    gree_token: str = Field(default="")
+    argument: str = Field(default="")
 
 
 class WorkflowLogQuery(BaseModel):
@@ -155,7 +155,7 @@ class WorkflowRunApi(Resource):
             args["external_trace_id"] = external_trace_id
         set_content(args["gree_mail"], args["gree_token"], args["argument"])
         streaming = payload.response_mode == "streaming"
-
+        # login_user = get_account_by_context()
         try:
             response = AppGenerateService.generate(
                 app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.SERVICE_API, streaming=streaming

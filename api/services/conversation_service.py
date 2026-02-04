@@ -30,6 +30,7 @@ from tasks.delete_conversation_task import delete_conversation_related_data
 logger = logging.getLogger(__name__)
 
 
+#  不使用游客登录形式了全部都改成gree account账号登录
 class ConversationService:
     @classmethod
     def pagination_by_last_id(

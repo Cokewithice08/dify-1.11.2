@@ -6,6 +6,7 @@ from typing import Union, cast
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+
 from core.app.app_config.entities import EasyUIBasedAppConfig, EasyUIBasedAppModelConfigFrom
 from core.app.apps.base_app_generator import BaseAppGenerator
 from core.app.apps.base_app_queue_manager import AppQueueManager
@@ -128,9 +129,15 @@ class MessageBasedAppGenerator(BaseAppGenerator):
         if application_generate_entity.invoke_from in {InvokeFrom.WEB_APP, InvokeFrom.SERVICE_API}:
             from_source = "api"
             end_user_id = application_generate_entity.user_id
+            # account_id = application_generate_entity.user_id
         else:
             from_source = "console"
             account_id = application_generate_entity.user_id
+        # from_source = "console"
+        #  补充上gree account_id
+        # if account_id is None:
+        #     argument_info_user_id = get_account_by_content()
+        #     account_id = argument_info_user_id
 
         if isinstance(application_generate_entity, AdvancedChatAppGenerateEntity):
             app_model_config_id = None

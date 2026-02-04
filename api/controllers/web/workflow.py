@@ -3,7 +3,7 @@ import logging
 from flask_restx import reqparse
 from werkzeug.exceptions import InternalServerError
 
-from controllers.common.context import set_content
+from controllers.common.context import set_content, get_account_by_context
 from controllers.web import web_ns
 from controllers.web.error import (
     CompletionRequestError,
@@ -69,6 +69,7 @@ class WorkflowRunApi(WebApiResource):
         )
         args = parser.parse_args()
         set_content(args["gree_mail"], args["gree_token"], args["argument"])
+        # login_user = get_account_by_context()
         try:
             response = AppGenerateService.generate(
                 app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.WEB_APP, streaming=True

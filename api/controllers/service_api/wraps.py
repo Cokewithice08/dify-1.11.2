@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -52,7 +53,6 @@ def validate_app_token(view: Callable[P, R] | None = None, *, fetch_user_arg: Fe
         @wraps(view_func)
         def decorated_view(*args: P.args, **kwargs: P.kwargs):
             api_token = validate_and_get_api_token("app")
-
             app_model = db.session.query(App).where(App.id == api_token.app_id).first()
             if not app_model:
                 raise Forbidden("The app no longer exists.")

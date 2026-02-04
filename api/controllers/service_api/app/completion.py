@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
 import services
-from controllers.common.context import set_content
+from controllers.common.context import set_content, get_account_by_context
 from controllers.common.schema import register_schema_models
 from controllers.service_api import service_api_ns
 from controllers.service_api.app.error import (
@@ -57,9 +57,9 @@ class ChatRequestPayload(BaseModel):
     retriever_from: str = Field(default="dev")
     auto_generate_name: bool = Field(default=True, description="Auto generate conversation name")
     workflow_id: str | None = Field(default=None, description="Workflow ID for advanced chat")
-    gree_mail: str | None = None
-    gree_token: str | None = None
-    argument: str | None = None
+    gree_mail: str = Field(default="")
+    gree_token: str = Field(default="")
+    argument: str = Field(default="")
 
     @field_validator("conversation_id", mode="before")
     @classmethod
@@ -208,7 +208,6 @@ class ChatApi(Resource):
             args["external_trace_id"] = external_trace_id
         set_content(args["gree_mail"], args["gree_token"], args["argument"])
         streaming = payload.response_mode == "streaming"
-
         try:
             response = AppGenerateService.generate(
                 app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.SERVICE_API, streaming=streaming

@@ -44,6 +44,7 @@ from libs.login import current_account_with_tenant, login_required
 from models import App
 from models.model import AppMode
 from models.workflow import Workflow
+from services.app_dsl_service import AppDslService
 from services.app_generate_service import AppGenerateService
 from services.errors.app import WorkflowHashNotEqualError
 from services.errors.llm import InvokeRateLimitError
@@ -149,17 +150,17 @@ class LoopNodeRunPayload(BaseModel):
 
 class DraftWorkflowRunPayload(BaseWorkflowRunPayload):
     inputs: dict[str, Any]
-    gree_mail: str | None = None
-    gree_token: str | None = None
-    argument: str | None = None
+    gree_mail: str = Field(default="")
+    gree_token: str = Field(default="")
+    argument: str = Field(default="")
 
 
 class DraftWorkflowNodeRunPayload(BaseWorkflowRunPayload):
     inputs: dict[str, Any]
     query: str = ""
-    gree_mail: str | None = None
-    gree_token: str | None = None
-    argument: str | None = None
+    gree_mail: str = Field(default="")
+    gree_token: str = Field(default="")
+    argument: str = Field(default="")
 
 
 class PublishWorkflowPayload(BaseModel):
@@ -690,7 +691,7 @@ class PublishedWorkflowApi(Resource):
         current_user, _ = current_account_with_tenant()
 
         args = PublishWorkflowPayload.model_validate(console_ns.payload or {})
-
+        workflow_id: str
         workflow_service = WorkflowService()
         with Session(db.engine) as session:
             workflow = workflow_service.publish_workflow(
@@ -700,7 +701,7 @@ class PublishedWorkflowApi(Resource):
                 marked_name=args.marked_name or "",
                 marked_comment=args.marked_comment or "",
             )
-
+            workflow_id = workflow.id
             # Update app_model within the same session to ensure atomicity
             app_model_in_session = session.get(App, app_model.id)
             if app_model_in_session:
@@ -711,7 +712,8 @@ class PublishedWorkflowApi(Resource):
             workflow_created_at = TimestampField().format(workflow.created_at)
 
             session.commit()
-
+            # gree应用发布更新备份
+        AppDslService.gree_app_dsl(app_model=app_model, include_secret=False, workflow_id=workflow_id)
         return {
             "result": "success",
             "created_at": workflow_created_at,

@@ -1,9 +1,14 @@
 import base64
 import hashlib
+import json
 import logging
+import platform
+import time
 import uuid
 from collections.abc import Mapping
 from enum import StrEnum
+from pathlib import Path
+import re
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -31,9 +36,11 @@ from events.app_event import app_model_config_was_updated, app_was_created
 from extensions.ext_redis import redis_client
 from factories import variable_factory
 from libs.datetime_utils import naive_utc_now
+from libs.login import current_account_with_tenant
 from models import Account, App, AppMode
 from models.model import AppModelConfig
 from models.workflow import Workflow
+from services.gree_sso import GreeGitServer
 from services.plugin.dependencies_analysis import DependenciesAnalysisService
 from services.workflow_draft_variable_service import WorkflowDraftVariableService
 from services.workflow_service import WorkflowService
@@ -564,8 +571,40 @@ class AppDslService:
             )
         else:
             cls._append_model_config_export_data(export_data, app_model)
-
         return yaml.dump(export_data, allow_unicode=True)
+
+    #  获取gree_app_dsl 上传副本
+    @classmethod
+    def gree_app_dsl(cls, app_model: App, include_secret: bool = False, workflow_id: str | None = None):
+        """
+        Export app
+        :param app_model: App instance
+        :param include_secret: Whether include secret variable
+        :return:
+        """
+        current_user: Account
+        current_user, tenant_id = current_account_with_tenant()
+        yml_str = cls.export_dsl(app_model, include_secret, workflow_id)
+        file_name = f"{app_model.name}_{int(time.time())}.yml"
+        ROOT_DIR = Path(r"F:\dify-push") if platform.system() == "Windows" else Path("/home/dify-app-backup")
+
+        # -------------------------- 2. 路径非法字符过滤（跨平台通用规则） --------------------------
+        # 匹配Windows+Linux所有路径非法字符（Windows：\ / : * ? " < > | ；Linux：/ ）
+        INVALID_CHARS_PATTERN = re.compile(r'[\\/:*?"<>|]')
+
+        # 过滤所有动态路径片段的非法字符（替换为下划线，保留语义）
+        safe_email = INVALID_CHARS_PATTERN.sub('_', current_user.email)  # 过滤邮箱（防止含@外的非法字符）
+        safe_app_mode = INVALID_CHARS_PATTERN.sub('_', app_model.mode)  # 过滤应用模式（兜底）
+        safe_app_name = INVALID_CHARS_PATTERN.sub('_', app_model.name)  # 过滤应用名称（核心，易含非法字符）
+        safe_file_name = INVALID_CHARS_PATTERN.sub('_', file_name)  # 过滤文件名（兜底）
+        file_path = ROOT_DIR / safe_email / safe_app_mode / safe_app_name / safe_file_name
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(yml_str, encoding="utf-8")
+        file_path_str = str(file_path)
+        logging.info(f"yml文件已经导出到本地服务器中了：{file_path_str}")
+        commit_msg = f"用户{current_user.email},发布应用更新{app_model.mode}:{app_model.name}在文件{file_path_str}中"
+        GreeGitServer.push_file_to_git(file_path, commit_msg)
 
     @classmethod
     def _append_workflow_export_data(
