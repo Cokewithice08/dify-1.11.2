@@ -21,6 +21,12 @@ RUN apt-get update \
           # for building gmpy2
           libmpfr-dev libmpc-dev
 
+# 新增：更新源并安装Git（核心，永久加入镜像）
+RUN apt update \
+    && apt install -y git openssh-client --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*  # 清理缓存
+
+
 # Install Python dependencies
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev

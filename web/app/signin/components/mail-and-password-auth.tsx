@@ -36,8 +36,8 @@ export default function MailAndPasswordAuth({ isInvite, isEmailSetup, allowRegis
   const [isLoading, setIsLoading] = useState(false)
   const [showGreeSSO, setShowGreeSSO] = useState(false)
   const pathName = window.location.href
-  const [greeSSOUrl, setGreeSSOUrl] = useState('https://wfserver.gree.com/Sso/Oauth/Show?appID=0347f117-1b67-46a1-b4ec-a173f7bffa14&sourceUrl=' + pathName)
-  // const [greeSSOUrl, setGreeSSOUrl] = useState('https://wfserver.gree.com/Sso/Oauth/Show?appID=5f4e61c6-29a2-40b2-a62e-c99602dc1f30&sourceUrl=' + pathName)
+  // const [greeSSOUrl, setGreeSSOUrl] = useState('https://wfserver.gree.com/Sso/Oauth/Show?appID=0347f117-1b67-46a1-b4ec-a173f7bffa14&sourceUrl=' + pathName)
+  const [greeSSOUrl, setGreeSSOUrl] = useState('https://wfserver.gree.com/Sso/Oauth/Show?appID=5f4e61c6-29a2-40b2-a62e-c99602dc1f30&sourceUrl=' + pathName)
 
   const handleEmailPasswordLogin = async () => {
     if (!email) {
@@ -160,8 +160,8 @@ export default function MailAndPasswordAuth({ isInvite, isEmailSetup, allowRegis
       // 步骤3：清除 URL 中的敏感参数
       router.replace('/apps');
     } else {
-      const greeSSOUrltmp = 'https://wfserver.gree.com/Sso/Oauth/Show?appID=0347f117-1b67-46a1-b4ec-a173f7bffa14&sourceUrl=' + pathName
-      // const greeSSOUrltmp = 'https://wfserver.gree.com/Sso/Oauth/Show?appID=5f4e61c6-29a2-40b2-a62e-c99602dc1f30&sourceUrl=' + pathName
+      // const greeSSOUrltmp = 'https://wfserver.gree.com/Sso/Oauth/Show?appID=0347f117-1b67-46a1-b4ec-a173f7bffa14&sourceUrl=' + pathName
+      const greeSSOUrltmp = 'https://wfserver.gree.com/Sso/Oauth/Show?appID=5f4e61c6-29a2-40b2-a62e-c99602dc1f30&sourceUrl=' + pathName
       setGreeSSOUrl(greeSSOUrltmp)
       // getIp().then((res: IPStatusResponse) => {
       //const greeSSOUrltmp = 'https://wfserver.gree.com/Sso/Oauth/Show?appID=0347f117-1b67-46a1-b4ec-a173f7bffa14&sourceUrl=http://' + res.ip_address + '/signin'

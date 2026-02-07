@@ -429,16 +429,20 @@ class ProviderConfiguration(BaseModel):
 
     def edit_endpoint_url_http(self, credentials: dict) -> dict:
         endpoint_url = credentials.get("endpoint_url")
+        logging.exception(f"打印修改之前endpoint——url地址:{credentials['endpoint_url']}")
         if endpoint_url and endpoint_url.startswith("https://baitong-ai.gree.com/openapi/cllm/"):
             endpoint_url = endpoint_url.replace("https://", "http://", 1)
         credentials["endpoint_url"] = endpoint_url
+        logging.exception(f"打印修改之后endpoint——url地址:{credentials['endpoint_url']}")
         return credentials
 
     def editor_endpoint_url_https(self, credentials: dict) -> dict:
         endpoint_url = credentials.get("endpoint_url")
+        logging.exception(f"打印转换之前的endpoint——url地址:{credentials['endpoint_url']}")
         if endpoint_url and endpoint_url.startswith("http://baitong-ai.gree.com/openapi/cllm/"):
             endpoint_url = endpoint_url.replace("http://", "https://", 1)
         credentials["endpoint_url"] = endpoint_url
+        logging.exception(f"打印准换之后endpoint——url地址:{credentials['endpoint_url']}")
         return credentials
 
     def create_provider_credential(self, credentials: dict, credential_name: str | None):

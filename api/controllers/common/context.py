@@ -163,7 +163,7 @@ def get_gree_mail_by_ip() -> str:
     ip = request.remote_addr
     forwarded_ip = request.headers.get('X-Forwarded-For')
     if forwarded_ip:
-        ip = forwarded_ip.split(',')[0].split()
+        ip = forwarded_ip.split(',')[0].strip()
     email = str(db.session.query(Account.email).filter_by(last_login_ip=ip).first())
     if email:
         email_str = email[0]

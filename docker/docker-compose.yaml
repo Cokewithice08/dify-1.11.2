@@ -692,7 +692,13 @@ services:
 
   # API service
   api:
-    image: langgenius/dify-api:1.11.2
+    build:
+      context: ../api  # 指定 Dockerfile 所在的目录
+      dockerfile: Dockerfile  # 指定 Dockerfile 文件名
+    image: gree/dify-api:1.11.2
+    extra_hosts:
+      - "wfserver.gree.com:10.1.1.241"
+      - "baitong-ai.gree.com:10.1.127.22"
     restart: always
     environment:
       # Use the shared environment variables.
@@ -707,6 +713,8 @@ services:
       PLUGIN_MAX_PACKAGE_SIZE: ${PLUGIN_MAX_PACKAGE_SIZE:-52428800}
       PLUGIN_DAEMON_TIMEOUT: ${PLUGIN_DAEMON_TIMEOUT:-600.0}
       INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+    ports:
+      - "${EXPOSE_API_PORT:-5001}:5001"
     depends_on:
       init_permissions:
         condition: service_completed_successfully
@@ -724,9 +732,19 @@ services:
         required: false
       redis:
         condition: service_started
+    user: dify:dify  # 保留原有运行用户
     volumes:
       # Mount the storage directory to the container, for storing user files.
       - ./volumes/app/storage:/app/api/storage
+        # 新增：宿主机目录:容器内目录（关键挂载配置）
+      - /home/dify-app-backup:/home/dify-app-backup
+      # Mount the storage directory to the container, for storing user files.
+      - /home/dify_ssh:/home/dify/.ssh    # 若用SSH免密，保留SSH挂载
+      - /etc/hosts:/etc/hosts
+    command: >
+      sh -c "git config --global user.name '180968' &&
+             git config --global user.email '180968@it2004.gree.com' &&
+             git config --global --add safe.directory /home/dify-app-backup"
     networks:
       - ssrf_proxy_network
       - default
@@ -734,7 +752,7 @@ services:
   # worker service
   # The Celery worker for processing all queues (dataset, workflow, mail, etc.)
   worker:
-    image: langgenius/dify-api:1.11.2
+    image: gree/dify-api:1.11.2
     restart: always
     environment:
       # Use the shared environment variables.
@@ -773,7 +791,7 @@ services:
   # worker_beat service
   # Celery beat for scheduling periodic tasks.
   worker_beat:
-    image: langgenius/dify-api:1.11.2
+    image: gree/dify-api:1.11.2
     restart: always
     environment:
       # Use the shared environment variables.
@@ -803,7 +821,10 @@ services:
 
   # Frontend web application.
   web:
-    image: langgenius/dify-web:1.11.2
+    build:
+      context: ../web  # 指定 Dockerfile 所在的目录
+      dockerfile: Dockerfile  # 指定 Dockerfile 文件名
+    image: gree/dify-web:1.11.2
     restart: always
     environment:
       CONSOLE_API_URL: ${CONSOLE_API_URL:-}
@@ -829,7 +850,9 @@ services:
       ENABLE_WEBSITE_JINAREADER: ${ENABLE_WEBSITE_JINAREADER:-true}
       ENABLE_WEBSITE_FIRECRAWL: ${ENABLE_WEBSITE_FIRECRAWL:-true}
       ENABLE_WEBSITE_WATERCRAWL: ${ENABLE_WEBSITE_WATERCRAWL:-true}
-
+    ports:
+      - "${EXPOSE_WEB_PORT:-3000}:3000"
+      
   # The PostgreSQL database.
   db_postgres:
     image: postgres:15-alpine
@@ -851,6 +874,8 @@ services:
                -c 'idle_in_transaction_session_timeout=${POSTGRES_IDLE_IN_TRANSACTION_SESSION_TIMEOUT:-0}'
     volumes:
       - ./volumes/db/data:/var/lib/postgresql/data
+    ports:
+      - "${EXPOSE_POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test:
         [
@@ -903,6 +928,8 @@ services:
     restart: always
     environment:
       REDISCLI_AUTH: ${REDIS_PASSWORD:-difyai123456}
+    ports:
+      - "${EXPOSE_REDIS_PORT:-6379}:6379"
     volumes:
       # Mount the redis data directory to the container.
       - ./volumes/redis/data:/data
@@ -943,6 +970,9 @@ services:
   plugin_daemon:
     image: langgenius/dify-plugin-daemon:0.5.2-local
     restart: always
+    extra_hosts:
+      - "wfserver.gree.com:10.1.1.241"
+      - "baitong-ai.gree.com:10.1.127.22"
     environment:
       # Use the shared environment variables.
       <<: *shared-api-worker-env
