@@ -12,19 +12,22 @@ RUN pip install --no-cache-dir uv==${UV_VERSION}
 FROM base AS packages
 
 # if you located in China, you can use aliyun mirror to speed up
-# RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources
+RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
           # basic environment
           g++ \
           # for building gmpy2
-          libmpfr-dev libmpc-dev
+          libmpfr-dev libmpc-dev \
+          git \
+          openssh-client \
+    && rm -rf /var/lib/apt/lists/*  # 清理缓存
 
 # 新增：更新源并安装Git（核心，永久加入镜像）
-RUN apt update \
-    && apt install -y git openssh-client --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*  # 清理缓存
+#RUN apt update \
+#    && apt install -y git openssh-client --no-install-recommends \
+#    && rm -rf /var/lib/apt/lists/*  # 清理缓存
 
 
 # Install Python dependencies
@@ -32,7 +35,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev
 
 # production stage
-FROM base AS production
+#FROM base AS production
+FROM packages AS production
 
 ENV FLASK_APP=app.py
 ENV EDITION=SELF_HOSTED

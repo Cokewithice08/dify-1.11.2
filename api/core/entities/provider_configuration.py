@@ -429,20 +429,20 @@ class ProviderConfiguration(BaseModel):
 
     def edit_endpoint_url_http(self, credentials: dict) -> dict:
         endpoint_url = credentials.get("endpoint_url")
-        logging.exception(f"打印修改之前endpoint——url地址:{credentials['endpoint_url']}")
-        if endpoint_url and endpoint_url.startswith("https://baitong-ai.gree.com/openapi/cllm/"):
+        logger.exception(f"打印修改之前endpoint——url地址:{endpoint_url}")
+        if endpoint_url and endpoint_url.startswith("https://baitong-ai.gree.com"):
             endpoint_url = endpoint_url.replace("https://", "http://", 1)
         credentials["endpoint_url"] = endpoint_url
-        logging.exception(f"打印修改之后endpoint——url地址:{credentials['endpoint_url']}")
+        logger.exception(f"打印修改之后endpoint——url地址:{credentials['endpoint_url']}")
         return credentials
 
     def editor_endpoint_url_https(self, credentials: dict) -> dict:
         endpoint_url = credentials.get("endpoint_url")
-        logging.exception(f"打印转换之前的endpoint——url地址:{credentials['endpoint_url']}")
-        if endpoint_url and endpoint_url.startswith("http://baitong-ai.gree.com/openapi/cllm/"):
+        logger.exception(f"打印转换之前的endpoint——url地址:{endpoint_url}")
+        if endpoint_url and endpoint_url.startswith("http://baitong-ai.gree.com"):
             endpoint_url = endpoint_url.replace("http://", "https://", 1)
         credentials["endpoint_url"] = endpoint_url
-        logging.exception(f"打印准换之后endpoint——url地址:{credentials['endpoint_url']}")
+        logger.exception(f"打印准换之后endpoint——url地址:{credentials['endpoint_url']}")
         return credentials
 
     def create_provider_credential(self, credentials: dict, credential_name: str | None):
@@ -453,7 +453,7 @@ class ProviderConfiguration(BaseModel):
         :return:
         """
         #  要先去判断是否是https://baitong-ai.gree.com/openapi/cllm/这个网址的，如果是就把https改成http，在保存数据库时改成https
-        credentials = self.edit_endpoint_url_http(credentials)
+        # credentials = self.edit_endpoint_url_http(credentials)
         with Session(db.engine) as session:
             if credential_name:
                 if self._check_provider_credential_name_exists(credential_name=credential_name, session=session):
@@ -463,8 +463,8 @@ class ProviderConfiguration(BaseModel):
 
             credentials = self.validate_provider_credentials(credentials=credentials, session=session)
             provider_record = self._get_provider_record(session)
-            # 这里修改credentials的endpoint_url 的值
-            credentials = self.editor_endpoint_url_https(credentials)
+            # # 这里修改credentials的endpoint_url 的值
+            # credentials = self.editor_endpoint_url_https(credentials)
             try:
                 new_record = ProviderCredential(
                     tenant_id=self.tenant_id,
@@ -939,6 +939,7 @@ class ProviderConfiguration(BaseModel):
         :param credentials: model credentials dict
         :return:
         """
+        credentials = self.edit_endpoint_url_http(credentials)
         with Session(db.engine) as session:
             if credential_name:
                 if self._check_custom_model_credential_name_exists(
@@ -954,7 +955,7 @@ class ProviderConfiguration(BaseModel):
                 model_type=model_type, model=model, credentials=credentials, session=session
             )
             provider_model_record = self._get_custom_model_record(model_type=model_type, model=model, session=session)
-
+            credentials = self.editor_endpoint_url_https(credentials)
             try:
                 credential = ProviderModelCredential(
                     tenant_id=self.tenant_id,
@@ -1004,6 +1005,7 @@ class ProviderConfiguration(BaseModel):
         :param credential_id: credential id
         :return:
         """
+        credentials = self.edit_endpoint_url_http(credentials)
         with Session(db.engine) as session:
             if credential_name and self._check_custom_model_credential_name_exists(
                 model=model,
@@ -1022,7 +1024,7 @@ class ProviderConfiguration(BaseModel):
                 session=session,
             )
             provider_model_record = self._get_custom_model_record(model_type=model_type, model=model, session=session)
-
+            credentials = self.editor_endpoint_url_https(credentials)
             stmt = select(ProviderModelCredential).where(
                 ProviderModelCredential.id == credential_id,
                 ProviderModelCredential.tenant_id == self.tenant_id,

@@ -8,10 +8,8 @@ from werkzeug.exceptions import NotFound, Unauthorized
 
 from configs import dify_config
 from constants import HEADER_NAME_APP_CODE
-from controllers.common.context import get_account_id_by_content
 from controllers.web import web_ns
 from controllers.web.error import WebAppAuthRequiredError
-from core.errors.error import GreeTokenExpiredError
 from extensions.ext_database import db
 from libs.passport import PassportService
 from libs.token import extract_webapp_access_token

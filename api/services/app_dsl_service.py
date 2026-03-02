@@ -604,7 +604,7 @@ class AppDslService:
         file_path_str = str(file_path)
         logging.info(f"yml文件已经导出到本地服务器中了：{file_path_str}")
         commit_msg = f"用户{current_user.email},发布应用更新{app_model.mode}:{app_model.name}在文件{file_path_str}中"
-        GreeGitServer.push_file_to_git(file_path, commit_msg)
+        # GreeGitServer.push_file_to_git(file_path, commit_msg)
 
     @classmethod
     def _append_workflow_export_data(
