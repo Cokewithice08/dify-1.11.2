@@ -106,13 +106,13 @@ def get_content() -> Optional[ArgumentInfo]:
     except LookupError:
         info = ArgumentInfo()
     if not info.gree_token:
-        info.gree_token = extract_gree_token_from_cookie(request)
-        if not info.gree_token:
-            info.gree_token = ""
+        # info.gree_token = extract_gree_token_from_cookie(request)
+        # if not info.gree_token:
+        info.gree_token = ""
     if not info.gree_mail:
-        info.gree_mail = extract_gree_mail_from_cookie(request)
-        if not info.gree_mail:
-            info.gree_mail = ""
+        # info.gree_mail = extract_gree_mail_from_cookie(request)
+        # if not info.gree_mail:
+        info.gree_mail = ""
     return info
 
 

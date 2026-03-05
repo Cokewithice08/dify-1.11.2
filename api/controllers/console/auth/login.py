@@ -273,7 +273,7 @@ class GreeCreateWorkspaceByAdminApi(Resource):
         # parser = reqparse.RequestParser()
         # parser.add_argument("workspace_param", type=list, required=True, location="json", help="添加workspaceAdmin")
         # args = parser.parse_args()
-        args_model = CreateWorkspacePayload.model_validate(request.args.to_dict())
+        args_model = CreateWorkspacePayload.model_validate(request.get_json())
         args = args_model.model_dump(exclude_none=True)
         workspace_list = []
         for workspace in args.get("workspace_param"):
