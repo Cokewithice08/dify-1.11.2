@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>组织架构API测试</title>
+</head>
+<body>
+    <h1>组织架构API测试</h1>
+    <button onclick="testAPI()">测试组织架构API</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '正在测试...';
+            
+            try {
+                const response = await fetch('http://localhost:5001/console/api/organizations/organizations');
+                const result = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h3>API响应结果:</h3>
+                    <p><strong>状态:</strong> ${result.success ? '成功' : '失败'}</p>
+                    <p><strong>消息:</strong> ${result.message}</p>
+                    <p><strong>数据源:</strong> ${result.source || '未知'}</p>
+                    <p><strong>组织数量:</strong> ${result.data ? result.data.length : 0}</p>
+                    <details>
+                        <summary>详细数据 (点击展开)</summary>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    </details>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

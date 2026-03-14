@@ -15,7 +15,7 @@ from core.errors.error import GreeTokenExpiredError
 from libs.helper import extract_remote_ip
 import models
 from extensions.ext_redis import redis_client
-from models import Conversation, Message, TenantAccountJoin, EndUser
+from models import Conversation, Message, TenantAccountJoin, EndUser, GreeAccounts
 from models.engine import db
 from sqlalchemy import func
 from sqlalchemy.orm import Query
@@ -160,9 +160,40 @@ def get_gree_token_pair(token: str) -> TokenGree:
         workspace = False
         account = RegisterService.register(email, name, password, None, None, language, status, is_setup, workspace)
         # TenantService.create_owner_tenant_if_not_exist(account=account, is_setup=True)
-    redis_key = get_redis_key(user_info.StaffID)
-    user_info.user_id = account.id
-    redis_client.set(redis_key, json.dumps(user_info.__dict__))
+    # 根据user_info中staffid去查询gree_accounts表，如果表中没有相关数据就新增一条数据
+    gree_account = GreeAccounts.query.filter_by(staff_id=user_info.StaffID).first()
+    if not gree_account:
+        gree_account = GreeAccounts(
+            user_id=account.id,
+            staff_id=user_info.StaffID,
+            emp_id=user_info.EmpID,
+            hr_emp_id=user_info.HREmpID,
+            org_l1_alias=user_info.OrgL1Alias,
+            org_l1_name=user_info.OrgL1Name,
+            org_l2_alias=user_info.OrgL2Alias,
+            org_l2_name=user_info.OrgL2Name,
+            org_l3_alias=user_info.OrgL3Alias,
+            org_l3_name=user_info.OrgL3Name,
+            job=user_info.Job,
+            user_name=user_info.UserName,
+            department_id=user_info.DepartmentID,
+            department_name=user_info.DepartmentName,
+            company_id=user_info.CompanyID,
+            company_name=user_info.CompanyName,
+            title=user_info.Title,
+            office=user_info.Office,
+            in_service=user_info.InService,
+            phone=user_info.Phone,
+            office_leader=user_info.OfficeLeader,
+            dept_leader=user_info.DeptLeader,
+            ip=user_info.IP,
+        )
+        db.session.add(gree_account)
+        db.session.commit()
+
+    # redis_key = get_redis_key(user_info.StaffID)
+    # user_info.user_id = account.id
+    # redis_client.set(redis_key, json.dumps(user_info.__dict__))
     login_ip = GreeSsoService.get_ip_address()
     if user_info.UserName != account.name:
         account.name = user_info.UserName
@@ -207,9 +238,39 @@ def create_or_update_user_info(token: str) -> UserInfo:
             is_setup,
             workspace)
         # TenantService.create_owner_tenant_if_not_exist(account=account, is_setup=True)
-    redis_key = get_redis_key(user_info.StaffID)
-    user_info.user_id = account.id
-    redis_client.set(redis_key, json.dumps(user_info.__dict__))
+      # 根据user_info中staffid去查询gree_accounts表，如果表中没有相关数据就新增一条数据
+    gree_account = GreeAccounts.query.filter_by(staff_id=user_info.StaffID).first()
+    if not gree_account:
+        gree_account = GreeAccounts(
+            user_id=account.id,
+            staff_id=user_info.StaffID,
+            emp_id=user_info.EmpID,
+            hr_emp_id=user_info.HREmpID,
+            org_l1_alias=user_info.OrgL1Alias,
+            org_l1_name=user_info.OrgL1Name,
+            org_l2_alias=user_info.OrgL2Alias,
+            org_l2_name=user_info.OrgL2Name,
+            org_l3_alias=user_info.OrgL3Alias,
+            org_l3_name=user_info.OrgL3Name,
+            job=user_info.Job,
+            user_name=user_info.UserName,
+            department_id=user_info.DepartmentID,
+            department_name=user_info.DepartmentName,
+            company_id=user_info.CompanyID,
+            company_name=user_info.CompanyName,
+            title=user_info.Title,
+            office=user_info.Office,
+            in_service=user_info.InService,
+            phone=user_info.Phone,
+            office_leader=user_info.OfficeLeader,
+            dept_leader=user_info.DeptLeader,
+            ip=user_info.IP,
+        )
+        db.session.add(gree_account)
+        db.session.commit()
+    # redis_key = get_redis_key(user_info.StaffID)
+    # user_info.user_id = account.id
+    # redis_client.set(redis_key, json.dumps(user_info.__dict__))
     login_ip = GreeSsoService.get_ip_address()
     if user_info.UserName != account.name:
         account.name = user_info.UserName

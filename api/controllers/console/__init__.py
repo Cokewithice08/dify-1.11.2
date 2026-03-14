@@ -116,6 +116,9 @@ from .explore import (
 # Import tag controllers
 from .tag import tags
 
+# Import organization controllers
+from . import organization
+
 # Import workspace controllers
 from .workspace import (
     account,
@@ -208,4 +211,5 @@ __all__ = [
     "workflow_statistic",
     "workflow_trigger",
     "workspace",
+    "organization",
 ]

@@ -17,8 +17,9 @@ from core.tools.workflow_as_tool.provider import WorkflowToolProviderController
 from core.tools.workflow_as_tool.tool import WorkflowTool
 from extensions.ext_database import db
 from models.model import App
-from models.tools import WorkflowToolProvider
+from models.tools import ToolsOrganization, WorkflowToolProvider
 from models.workflow import Workflow
+from models import GreeAccounts
 from services.tools.tools_transform_service import ToolTransformService
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ class WorkflowToolManageService:
         parameters: list[Mapping[str, Any]],
         privacy_policy: str = "",
         labels: list[str] | None = None,
+        visible_org_ids: list[str] | None = None,
     ):
         WorkflowToolConfigurationUtils.check_parameter_configurations(parameters)
 
@@ -82,6 +84,17 @@ class WorkflowToolManageService:
                 version=workflow.version,
             )
             session.add(workflow_tool_provider)
+            session.flush()  # 确保 workflow_tool_provider 有 id
+
+            # 如果 visible_org_ids 不为空，保存到 tools_organization 表
+            if visible_org_ids is not None and len(visible_org_ids) > 0:
+                for org_id in visible_org_ids:
+                    tools_org = ToolsOrganization(
+                        app_id=workflow_app_id,
+                        org_id=org_id,
+                        user_id=user_id,
+                    )
+                    session.add(tools_org)
 
         try:
             WorkflowToolProviderController.from_db(workflow_tool_provider)
@@ -111,6 +124,7 @@ class WorkflowToolManageService:
         parameters: list[Mapping[str, Any]],
         privacy_policy: str = "",
         labels: list[str] | None = None,
+        visible_org_ids: list[str] | None = None,
     ):
         """
         Update a workflow tool.
@@ -175,6 +189,20 @@ class WorkflowToolManageService:
             WorkflowToolProviderController.from_db(workflow_tool_provider)
         except Exception as e:
             raise ValueError(str(e))
+        
+        # 更新 visible_org_ids 数据到 tools_organization 表
+        # 先删除 tools_organization 中 app_id 等于 workflow_tool_provider.app_id 的所有记录
+        db.session.query(ToolsOrganization).filter_by(app_id=workflow_tool_provider.app_id).delete()
+        
+        # 如果 visible_org_ids 不为空，插入新的记录
+        if visible_org_ids is not None and len(visible_org_ids) > 0:
+            for org_id in visible_org_ids:
+                tools_org = ToolsOrganization(
+                    app_id=workflow_tool_provider.app_id,
+                    org_id=org_id,
+                    user_id=user_id,
+                )
+                db.session.add(tools_org)
 
         db.session.commit()
 
@@ -196,12 +224,39 @@ class WorkflowToolManageService:
         :param tenant_id: the tenant id
         :return: the list of tools
         """
-        # db_tools = db.session.scalars(
-        #     select(WorkflowToolProvider).where(WorkflowToolProvider.tenant_id == tenant_id)
-        # ).all()
-        db_tools = db.session.scalars(
+        # 根据user_id获取GreeAccounts表中的office字段信息，然后在ToolsOrganization表中获取org_id等于office的数据的所有app_id要去重，
+        # 然后拿到所有符合条件的app_id去表WorkflowToolProvider中获取app_id相等的数据加上一条条件WorkflowToolProvider.tenant_id == tenant_id结果也要去重
+        
+        # 使用子查询优化：直接通过SQL关联查询获取符合条件的工具
+        # 查询1：基于用户部门权限的工具
+        tools_by_org = db.session.scalars(
             select(WorkflowToolProvider)
+            .join(
+                ToolsOrganization,
+                WorkflowToolProvider.app_id == ToolsOrganization.app_id
+            )
+            .join(
+                GreeAccounts,
+                ToolsOrganization.org_id == GreeAccounts.office
+            )
+            .where(
+                GreeAccounts.user_id == user_id
+            )
         ).all()
+
+        # 查询2：基于租户ID的工具
+        tools_by_tenant = db.session.scalars(
+            select(WorkflowToolProvider)
+            .where(
+                WorkflowToolProvider.tenant_id == tenant_id
+            )
+        ).all()
+
+        # 合并结果并去重
+        db_tools = list({tool.id: tool for tool in tools_by_org + tools_by_tenant}.values())
+        
+
+
         # Create a mapping from provider_id to app_id
         provider_id_to_app_id = {provider.id: provider.app_id for provider in db_tools}
 
@@ -244,10 +299,25 @@ class WorkflowToolManageService:
         :param tenant_id: the tenant id
         :param workflow_tool_id: the workflow tool id
         """
-        db.session.query(WorkflowToolProvider).where(
-            WorkflowToolProvider.tenant_id == tenant_id, WorkflowToolProvider.id == workflow_tool_id
-        ).delete()
+        provider = db.session.query(WorkflowToolProvider).options(
+            load_only(WorkflowToolProvider.id, WorkflowToolProvider.app_id)  # 只加载 id 和 app_id
+        ).filter_by(
+            tenant_id=tenant_id,
+            id=workflow_tool_id
+        ).first()
 
+        if provider is None:
+            raise ValueError("Tool not found")
+
+        app_id = provider.app_id
+
+        # db.session.query(WorkflowToolProvider).where(
+        #     WorkflowToolProvider.tenant_id == tenant_id, WorkflowToolProvider.id == workflow_tool_id
+        # ).delete()
+        # 删除tools_organization中app_id等于workflow_tool_provider.app_id的记录
+        db.session.query(ToolsOrganization).filter_by(app_id=app_id).delete()
+        # 3. 删除workflow_tool_provider记录
+        db.session.delete(provider)
         db.session.commit()
 
         # Invalidate tool providers cache
@@ -284,7 +354,7 @@ class WorkflowToolManageService:
             db.session.query(WorkflowToolProvider)
             .where(WorkflowToolProvider.tenant_id == tenant_id, WorkflowToolProvider.app_id == workflow_app_id)
             .first()
-        )
+        )          
         return cls._get_workflow_tool(tenant_id, db_tool)
 
     @classmethod
@@ -316,7 +386,15 @@ class WorkflowToolManageService:
         tool_entity = workflow_tools[0].entity
         # get output schema from workflow tool entity
         output_schema = tool_entity.output_schema
-
+        # 根据app_id获取全部tools_organization记录
+        tools_organization: list[ToolsOrganization] = (
+            db.session.query(ToolsOrganization)
+            .where(ToolsOrganization.app_id == db_tool.app_id)
+            .all()
+        )
+        # 提取org_id数组
+        visible_org_ids = [org.org_id for org in tools_organization]
+        
         return {
             "name": db_tool.name,
             "label": db_tool.label,
@@ -333,6 +411,7 @@ class WorkflowToolManageService:
             ),
             "synced": workflow.version == db_tool.version,
             "privacy_policy": db_tool.privacy_policy,
+            "visible_org_ids": visible_org_ids,
         }
 
     @classmethod

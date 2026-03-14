@@ -131,6 +131,7 @@ const WorkflowToolConfigureButton = ({
       outputParameters,
       labels: detail?.tool?.labels || [],
       privacy_policy: detail?.privacy_policy || '',
+      visible_org_ids: (detail as any)?.visible_org_ids || [],
       ...(published
         ? {
             workflow_tool_id: detail?.workflow_tool_id,

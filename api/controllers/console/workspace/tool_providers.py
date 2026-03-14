@@ -480,6 +480,7 @@ parser_create = (
     .add_argument("parameters", type=list[dict], required=True, nullable=False, location="json")
     .add_argument("privacy_policy", type=str, required=False, nullable=True, location="json", default="")
     .add_argument("labels", type=list[str], required=False, nullable=True, location="json")
+    .add_argument("visible_org_ids", type=list[str], required=True, nullable=True, location="json")
 )
 
 
@@ -508,6 +509,7 @@ class ToolWorkflowProviderCreateApi(Resource):
             parameters=args["parameters"],
             privacy_policy=args["privacy_policy"],
             labels=args["labels"],
+            visible_org_ids=args["visible_org_ids"],
         )
 
 
@@ -521,6 +523,7 @@ parser_workflow_update = (
     .add_argument("parameters", type=list[dict], required=True, nullable=False, location="json")
     .add_argument("privacy_policy", type=str, required=False, nullable=True, location="json", default="")
     .add_argument("labels", type=list[str], required=False, nullable=True, location="json")
+    .add_argument("visible_org_ids", type=list[str], required=True, nullable=True, location="json")
 )
 
 
@@ -551,6 +554,7 @@ class ToolWorkflowProviderUpdateApi(Resource):
             args["parameters"],
             args["privacy_policy"],
             args.get("labels", []),
+            visible_org_ids=args["visible_org_ids"],
         )
 
 

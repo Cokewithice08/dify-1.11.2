@@ -535,3 +535,31 @@ class DeprecatedPublishedAppTool(TypeBase):
     @property
     def description_i18n(self) -> "I18nObject":
         return I18nObject.model_validate(json.loads(self.description))
+
+
+class ToolsOrganization(TypeBase):
+    """
+    The table stores the relationship between tools and organizations.
+    """
+
+    __tablename__ = "tools_organization"
+    __table_args__ = (
+        sa.PrimaryKeyConstraint("id", name="tools_organization_pkey"),
+        sa.UniqueConstraint("app_id", "org_id", name="unique_tools_organization_app_org"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        StringUUID, insert_default=lambda: str(uuid4()), default_factory=lambda: str(uuid4()), init=False
+    )
+    # app id of the workflow tool
+    app_id: Mapped[str] = mapped_column(StringUUID, nullable=False)
+    # organization id
+    org_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    # user id
+    user_id: Mapped[str] = mapped_column(StringUUID, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime, nullable=False, server_default=func.current_timestamp(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime, nullable=False, server_default=func.current_timestamp(), init=False
+    )

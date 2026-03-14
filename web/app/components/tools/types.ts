@@ -220,6 +220,7 @@ export type WorkflowToolProviderRequest = {
   parameters: WorkflowToolProviderParameter[]
   labels: string[]
   privacy_policy: string
+  visible_org_ids?: string[]
 }
 
 export type WorkflowToolProviderResponse = {

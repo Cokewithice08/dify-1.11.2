@@ -4,7 +4,7 @@ import type { Emoji, WorkflowToolProviderOutputParameter, WorkflowToolProviderPa
 import { RiErrorWarningLine } from '@remixicon/react'
 import { produce } from 'immer'
 import * as React from 'react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import AppIcon from '@/app/components/base/app-icon'
 import Button from '@/app/components/base/button'
@@ -20,6 +20,14 @@ import MethodSelector from '@/app/components/tools/workflow-tool/method-selector
 import { VarType } from '@/app/components/workflow/types'
 import { cn } from '@/utils/classnames'
 import { buildWorkflowOutputParameters } from './utils'
+import { RiArrowDownSLine } from '@remixicon/react'
+import { useDebounceFn } from 'ahooks'
+import Checkbox from '@/app/components/base/checkbox'
+import {
+  PortalToFollowElem,
+  PortalToFollowElemContent,
+  PortalToFollowElemTrigger,
+} from '@/app/components/base/portal-to-follow-elem'
 
 type Props = {
   isAdd?: boolean
@@ -72,6 +80,170 @@ const WorkflowToolAsModal: FC<Props> = ({
       reserved: true,
     },
   ]
+  
+  // 动态获取组织架构树数据
+  const [organizationTree, setOrganizationTree] = useState<any[]>([])
+  const [loadingOrg, setLoadingOrg] = useState(false)
+  
+  // 获取组织架构数据
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        setLoadingOrg(true)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_PREFIX}/organizations/organizations`)
+        const result = await response.json()
+        
+        if (result.success) {
+          setOrganizationTree(result.data)
+        } else {
+          console.error('获取组织架构失败:', result.message)
+          Toast.notify({
+            type: 'error',
+            message: '获取组织架构失败',
+          })
+        }
+      } catch (error) {
+        console.error('获取组织架构出错:', error)
+        Toast.notify({
+          type: 'error',
+          message: '获取组织架构出错',
+        })
+      } finally {
+        setLoadingOrg(false)
+      }
+    }
+    
+    fetchOrganizations()
+  }, [])
+  
+  // 下拉框展开状态
+  const [open, setOpen] = useState(false)
+  // 搜索关键词
+  const [keywords, setKeywords] = useState('')
+  const [searchKeywords, setSearchKeywords] = useState('')
+  const { run: handleSearch } = useDebounceFn(() => {
+    setSearchKeywords(keywords)
+  }, { wait: 500 })
+  const handleKeywordsChange = (value: string) => {
+    setKeywords(value)
+    handleSearch()
+  }
+  
+  // 递归获取所有第三级组织ID
+  const getAllThirdLevelOrgIds = (node: any): string[] => {
+    if (!node.children || node.children.length === 0) {
+      return [node.id]
+    }
+    let ids: string[] = []
+    node.children.forEach((child: any) => {
+      ids = [...ids, ...getAllThirdLevelOrgIds(child)]
+    })
+    return ids
+  }
+  
+  // 处理组织选择
+  const handleOrgSelect = (orgId: string) => {
+    const selectedNode = findNodeById(organizationTree, orgId)
+    if (!selectedNode) return
+    
+    const thirdLevelIds = getAllThirdLevelOrgIds(selectedNode)
+    
+    setSelectedOrgIds(prev => {
+      // 检查是否所有第三级节点都已选中
+      const allSelected = thirdLevelIds.every(id => prev.includes(id))
+      
+      if (allSelected) {
+        // 取消选择所有第三级节点
+        return prev.filter(id => !thirdLevelIds.includes(id))
+      } else {
+        // 选择所有第三级节点
+        const newIds = [...prev]
+        thirdLevelIds.forEach(id => {
+          if (!newIds.includes(id)) {
+            newIds.push(id)
+          }
+        })
+        return newIds
+      }
+    })
+  }
+  
+  // 根据ID查找节点
+  const findNodeById = (nodes: any[], id: string): any => {
+    for (const node of nodes) {
+      if (node.id === id) {
+        return node
+      }
+      if (node.children) {
+        const found = findNodeById(node.children, id)
+        if (found) {
+          return found
+        }
+      }
+    }
+    return null
+  }
+  
+  // 检查节点是否被选择
+  const isNodeSelected = (node: any): boolean => {
+    // 如果节点没有子节点，直接检查该节点的ID是否在selectedOrgIds中
+    if (!node.children || node.children.length === 0) {
+      const isSelected = selectedOrgIds.includes(node.id)
+      return isSelected
+    }
+    
+    // 如果有子节点，检查所有子节点是否都被选择
+    const thirdLevelIds = getAllThirdLevelOrgIds(node)
+    const isSelected = thirdLevelIds.every(id => selectedOrgIds.includes(id))
+    return isSelected
+  }
+  
+  // 过滤节点
+  const filterNodes = (nodes: any[]): any[] => {
+    if (!searchKeywords) return nodes
+    
+    return nodes.filter(node => {
+      // 检查当前节点是否匹配
+      const nodeMatches = node.name.toLowerCase().includes(searchKeywords.toLowerCase())
+      
+      // 检查子节点是否匹配
+      if (node.children && node.children.length > 0) {
+        const filteredChildren = filterNodes(node.children)
+        if (filteredChildren.length > 0) {
+          return true
+        }
+      }
+      
+      return nodeMatches
+    })
+  }
+  
+  // 递归渲染组织架构树
+  const renderOrganizationTree = (nodes: any[], level: number = 0) => {
+    const filteredNodes = filterNodes(nodes)
+    
+    return filteredNodes.map(node => {
+      const isSelected = isNodeSelected(node)
+      
+      return (
+        <div key={node.id} className="py-1">
+          <div className="flex items-center">
+            <Checkbox
+              className="shrink-0"
+              checked={isSelected}
+              onCheck={() => handleOrgSelect(node.id)}
+            />
+            <div style={{ marginLeft: `${level * 16}px` }} className="text-sm leading-5 text-text-secondary">{node.name}</div>
+          </div>
+          {node.children && node.children.length > 0 && (
+            <div className="mt-1 pl-6">
+              {renderOrganizationTree(node.children, level + 1)}
+            </div>
+          )}
+        </div>
+      )
+    })
+  }
 
   const handleParameterChange = (key: string, value: any, index: number) => {
     const newData = produce(parameters, (draft: WorkflowToolProviderParameter[]) => {
@@ -88,6 +260,31 @@ const WorkflowToolAsModal: FC<Props> = ({
   }
   const [privacyPolicy, setPrivacyPolicy] = useState(payload.privacy_policy)
   const [showModal, setShowModal] = useState(false)
+  
+  // 存储选择的组织ID，直接从payload中初始化
+  const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>([])
+  
+  // 组件挂载时初始化selectedOrgIds
+  useEffect(() => {
+    console.log('=== 组件挂载初始化 ===')
+    console.log('完整payload:', JSON.stringify(payload, null, 2))
+    console.log('payload.visible_org_ids:', payload.visible_org_ids)
+    console.log('payload.visible_org_ids类型:', typeof payload.visible_org_ids)
+    console.log('payload.visible_org_ids长度:', payload.visible_org_ids?.length)
+    if (payload.visible_org_ids && Array.isArray(payload.visible_org_ids) && payload.visible_org_ids.length > 0) {
+      console.log('初始化selectedOrgIds:', payload.visible_org_ids)
+      setSelectedOrgIds(payload.visible_org_ids)
+    } else {
+      console.log('payload.visible_org_ids为空或不是数组')
+    }
+  }, []) // 只在组件挂载时执行一次
+  
+  // 调试日志
+  useEffect(() => {
+    console.log('=== 状态更新 ===')
+    console.log('selectedOrgIds:', selectedOrgIds)
+    console.log('organizationTree length:', organizationTree.length)
+  }, [selectedOrgIds, organizationTree])
 
   const isNameValid = (name: string) => {
     // when the user has not input anything, no need for a warning
@@ -120,6 +317,21 @@ const WorkflowToolAsModal: FC<Props> = ({
       return
     }
 
+    // 获取所有选中的第三级组织ID（已经是第三级了，但确保格式正确）
+    const visibleOrgIds = selectedOrgIds.filter(id => {
+      // 验证ID是否存在于组织架构树中且是第三级
+      const node = findNodeById(organizationTree, id)
+      return node && (!node.children || node.children.length === 0)
+    })
+    // 验证这个可见权限不能为空
+    if (visibleOrgIds.length === 0) {
+      Toast.notify({
+        type: 'error',
+        message: '可见权限不能为空',
+      })
+      return
+    }
+    
     const requestParams = {
       name,
       description,
@@ -132,14 +344,24 @@ const WorkflowToolAsModal: FC<Props> = ({
       })),
       labels,
       privacy_policy: privacyPolicy,
+      visible_org_ids: visibleOrgIds,
     }
+    
+    // 打印请求参数到控制台
+    console.log('请求参数:', requestParams)
+    console.log('选择的第三级组织ID数组:', visibleOrgIds)
+    
     if (!isAdd) {
+      // 打印出requestParams
+      console.log('更新请求参数:', requestParams)
       onSave?.({
         ...requestParams,
         workflow_tool_id: payload.workflow_tool_id,
       })
     }
     else {
+      // 打印出requestParams
+      console.log('创建请求参数:', requestParams)
       onCreate?.({
         ...requestParams,
         workflow_app_id: payload.workflow_app_id,
@@ -262,6 +484,62 @@ const WorkflowToolAsModal: FC<Props> = ({
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+              {/* 可见权限 */}
+              <div>
+                <div className="system-sm-medium py-2 text-text-primary">可见权限</div>
+                <div className="relative">
+                  <PortalToFollowElem
+                    open={open}
+                    onOpenChange={setOpen}
+                    placement="bottom-start"
+                    offset={4}
+                  >
+                    <PortalToFollowElemTrigger
+                      onClick={() => setOpen(v => !v)}
+                      className="block"
+                    >
+                      <div className={cn(
+                        'flex h-10 cursor-pointer items-center gap-1 rounded-lg border-[0.5px] border-transparent bg-components-input-bg-normal px-3 hover:bg-components-input-bg-hover',
+                        open && '!hover:bg-components-input-bg-hover hover:bg-components-input-bg-hover',
+                      )}
+                      >
+                        <div className="grow truncate text-[13px] leading-[18px] text-text-quaternary">
+                          {loadingOrg ? '加载中...' : selectedOrgIds.length > 0 ? `已选择 ${selectedOrgIds.length} 个部门` : '选择可见部门'}
+                        </div>
+                        <div className="ml-1 shrink-0 text-text-secondary opacity-60">
+                          <RiArrowDownSLine className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </PortalToFollowElemTrigger>
+                    <PortalToFollowElemContent className="z-[1040]">
+                      <div className="relative w-[591px] rounded-lg border-[0.5px] border-components-panel-border bg-components-panel-bg-blur shadow-lg  backdrop-blur-[5px]">
+                        <div className="border-b-[0.5px] border-divider-regular p-2">
+                          <Input
+                            showLeftIcon
+                            showClearIcon
+                            value={keywords}
+                            onChange={e => handleKeywordsChange(e.target.value)}
+                            onClear={() => handleKeywordsChange('')}
+                          />
+                        </div>
+                        <div className="max-h-[264px] overflow-y-auto p-1">
+                          {loadingOrg ? (
+                            <div className="flex items-center justify-center py-8 text-text-tertiary">
+                              加载组织架构中...
+                            </div>
+                          ) : organizationTree.length > 0 ? (
+                            renderOrganizationTree(organizationTree)
+                          ) : (
+                            <div className="flex items-center justify-center py-8 text-text-tertiary">
+                              暂无组织架构数据
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </PortalToFollowElemContent>
+                  </PortalToFollowElem>
                 </div>
               </div>
               {/* Tool Output  */}
