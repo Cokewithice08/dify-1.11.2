@@ -4,15 +4,19 @@ import models
 
 
 from .account_service import AccountService, RegisterService, TenantService
+from .plugin.plugin_service import PluginService
+
 
 
 class WorkspaceAdmin(BaseModel):
     mail: str
     parent_mail: str
 
-
 # 创建账号信息和workspace
 def create_workspace(workspace: WorkspaceAdmin):
+    plugin_service = PluginService()
+    parent_tenant: Optional[Tenant] = None
+    child_tenant: Optional[Tenant] = None
     if workspace.parent_mail:
         mail = workspace.parent_mail + '@it2004.gree.com.cn'
         account = AccountService.get_user_through_email(mail)
@@ -30,7 +34,11 @@ def create_workspace(workspace: WorkspaceAdmin):
             tenant_name = f"{account.name}'s Workspace"
             tenant_setup = True
             TenantService.create_owner_tenant_if_not_exist(account, tenant_name, tenant_setup)
-            parent_tenant = TenantService.get_account_owner_tenant_by_account(account)
+            parent_tenant = TenantService.get_account_owner_tenant_by_account(account)   
+            # 打印这个parent_tenant的类型
+            if parent_tenant:
+                plugin_service.add_plugin_to_user(parent_tenant.id)            
+            
         if workspace.mail:
             tenant_mail = workspace.mail + '@it2004.gree.com.cn'
             tenant_account = AccountService.get_user_through_email(tenant_mail)
@@ -50,6 +58,8 @@ def create_workspace(workspace: WorkspaceAdmin):
                 tenant_setup = True
                 TenantService.create_owner_tenant_if_not_exist(tenant_account, tenant_name, tenant_setup)
                 child_tenant = TenantService.get_account_owner_tenant_by_account(tenant_account)
+                if child_tenant:
+                    plugin_service.add_plugin_to_user(child_tenant.id)
             tenant_account_join = TenantService.create_tenant_member(child_tenant, account, "admin")
             # ProviderModelService.synchronous_provider_model_by_gree_admin(child_tenant.id)
 

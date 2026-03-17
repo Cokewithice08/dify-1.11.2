@@ -1,5 +1,7 @@
 import logging
 from collections.abc import Mapping, Sequence
+import platform
+from pathlib import Path
 from mimetypes import guess_type
 
 from pydantic import BaseModel
@@ -29,6 +31,8 @@ from extensions.ext_redis import redis_client
 from models.provider_ids import GenericProviderID
 from services.errors.plugin import PluginInstallationForbiddenError
 from services.feature_service import FeatureService, PluginInstallationScope
+from services.model_provider_service import ModelProviderService
+from core.model_runtime.errors.validate import CredentialsValidateFailedError
 
 logger = logging.getLogger(__name__)
 
@@ -352,6 +356,153 @@ class PluginService:
         PluginService._check_plugin_installation_scope(response.verification)
 
         return response
+
+#  给新用户添加插件和配置
+    @staticmethod
+    def add_plugin_to_user(tenant_id: str, async_install: bool = False):
+        """
+        Add plugin to user
+        
+        Args:
+            tenant_id: 租户ID
+            async_install: 是否异步安装，默认为False（同步安装）
+        """
+       
+        if async_install:
+            # 异步安装：提交Celery任务后立即返回
+            from tasks.plugin_install_task import install_plugins_for_tenant_task
+            install_plugins_for_tenant_task.delay(tenant_id)
+            return {"status": "pending", "message": "Plugin installation task has been submitted"}
+        
+        # 同步安装：直接执行安装逻辑
+        return PluginService._do_add_plugin_to_user(tenant_id)
+    
+    @staticmethod
+    def _do_add_plugin_to_user(tenant_id: str):
+        """
+        实际执行插件安装的逻辑（同步方法）
+        """
+        # 根据操作系统选择目录
+        if platform.system() == "Windows":
+            pkg_dir = Path("F:/dify-plugin")
+        else:
+            pkg_dir = Path("/dify-plugin")
+
+        # 检查目录是否存在
+        if not pkg_dir.exists():
+            raise ValueError(f"Plugin directory not found: {pkg_dir}")
+
+        # 获取所有 .pkg 文件
+        pkg_files = list(pkg_dir.glob("*.difypkg"))
+
+        if not pkg_files:
+            raise ValueError(f"No .pkg files found in {pkg_dir}")
+
+        results = []
+        errors = []
+
+        for pkg_file in pkg_files:
+            try:
+                # 读取文件内容
+                content = pkg_file.read_bytes()
+
+                # 检查文件大小
+                if len(content) > dify_config.PLUGIN_MAX_PACKAGE_SIZE:
+                    errors.append(f"{pkg_file.name}: File size exceeds the maximum allowed size")
+                    continue
+
+                # 上传文件
+                response = PluginService.upload_pkg(tenant_id, content)
+                plugin_unique_identifier = response.unique_identifier
+                PluginService.install_from_local_pkg(tenant_id, [plugin_unique_identifier])
+                PluginService.load_pkg_config_default(tenant_id)
+                results.append(f"{pkg_file.name}: installed successfully")
+            except Exception as e:
+                errors.append(f"{pkg_file.name}: {str(e)}")
+        
+        return {
+            "status": "completed",
+            "total": len(pkg_files),
+            "success": len(results),
+            "failed": len(errors),
+            "results": results,
+            "errors": errors
+        }
+
+#模拟添加模型参数 
+    @staticmethod
+    def load_pkg_config_default(tenant_id: str):
+        """
+        加载本地目录中的模型配置文件
+        
+        Args:
+            tenant_id: 租户ID
+            
+        Returns:
+            解析后的配置列表
+        """
+        import json
+        
+        # 根据操作系统选择目录
+        if platform.system() == "Windows":
+            pkg_dir = Path("F:/dify-plugin/models_config")
+        else:
+            pkg_dir = Path("/dify-plugin/models_config")
+
+        # 检查目录是否存在
+        if not pkg_dir.exists():
+            raise ValueError(f"Plugin directory not found: {pkg_dir}")
+        
+        # 获取所有 .json 文件
+        json_files = list(pkg_dir.glob("*.json"))
+
+        if not json_files:
+            raise ValueError(f"No .json files found in {pkg_dir}")
+        
+        configs = []
+        errors = []
+        
+        for json_file in json_files:
+            try:
+                # 读取文件内容
+                content = json_file.read_text(encoding='utf-8')
+                
+                # 解析 JSON 字符串为 dict
+                config = json.loads(content)
+                # 验证必要的字段
+                if not isinstance(config, dict):
+                    errors.append(f"{json_file.name}: Content is not a valid JSON object")
+                    continue
+                # 模拟调用添加动作
+                # 打印config
+                print(f"c打印config: {config}")
+                if config.get("provider_name"):
+                    model_provider_service = ModelProviderService()
+
+                    try:
+                        model_provider_service.create_model_credential(
+                            tenant_id=tenant_id,
+                            provider=config.get("provider_name"),
+                            model=config.get("model"),
+                            model_type=config.get("model_type"),
+                            credentials=config.get("credentials"),
+                            credential_name=config.get("name"),
+                        )
+                    except CredentialsValidateFailedError as ex:
+                        logger.exception(
+                            "Failed to save model credentials, tenant_id: %s, model: %s, model_type: %s",
+                            tenant_id,
+                            args.model,
+                            args.model_type,
+                        )
+                        raise ValueError(str(ex))
+                
+            except json.JSONDecodeError as e:
+                errors.append(f"{json_file.name}: JSON parse error - {str(e)}")
+            except Exception as e:
+                errors.append(f"{json_file.name}: {str(e)}")
+        
+
 
     @staticmethod
     def upload_pkg_from_github(

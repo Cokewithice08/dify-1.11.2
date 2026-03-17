@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+from typing import Optional
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -1267,7 +1268,7 @@ class TenantService:
         return TenantService.get_user_role(account, tenant) is not None
 
     @staticmethod
-    def get_account_owner_tenant_by_account(account: Account) -> Tenant:
+    def get_account_owner_tenant_by_account(account: Account) -> Optional[Tenant]:
         if account:
             if account.name:
                 name = f"{account.name}'s Workspace"

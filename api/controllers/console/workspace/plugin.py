@@ -1,5 +1,7 @@
 import io
+import platform
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Literal
 
 from flask import request, send_file
@@ -290,6 +292,80 @@ class PluginUploadFromPkgApi(Resource):
             raise ValueError(e)
 
         return jsonable_encoder(response)
+
+
+@console_ns.route("/workspaces/current/plugin/upload/pkg/sync")
+class PluginUploadFromSyncPkgApi(Resource):
+    """从本地目录批量上传 .pkg 插件文件"""
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @plugin_permission_required(install_required=True)
+    def post(self):
+        _, tenant_id = current_account_with_tenant()
+        result_json = PluginService.add_plugin_to_user(tenant_id, False)
+        return jsonable_encoder({
+            "result": result_json
+        })
+
+@console_ns.route("/workspaces/current/plugin/upload/pkg/local")
+class PluginUploadFromLocalPkgApi(Resource):
+    """从本地目录批量上传 .pkg 插件文件"""
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @plugin_permission_required(install_required=True)
+    def post(self):
+        _, tenant_id = current_account_with_tenant()
+
+        # 根据操作系统选择目录
+        if platform.system() == "Windows":
+            pkg_dir = Path("F:/dify-plugin")
+        else:
+            pkg_dir = Path("/dify-plugin")
+
+        # 检查目录是否存在
+        if not pkg_dir.exists():
+            raise ValueError(f"Plugin directory not found: {pkg_dir}")
+
+        # 获取所有 .pkg 文件
+        pkg_files = list(pkg_dir.glob("*.difypkg"))
+
+        if not pkg_files:
+            raise ValueError(f"No .pkg files found in {pkg_dir}")
+
+        results = []
+        errors = []
+
+        for pkg_file in pkg_files:
+            try:
+                # 读取文件内容
+                content = pkg_file.read_bytes()
+
+                # 检查文件大小
+                if len(content) > dify_config.PLUGIN_MAX_PACKAGE_SIZE:
+                    errors.append(f"{pkg_file.name}: File size exceeds the maximum allowed size")
+                    continue
+
+                # 上传文件
+                response = PluginService.upload_pkg(tenant_id, content)
+                results.append({
+                    "filename": pkg_file.name,
+                    "status": "success",
+                    "response": response
+                })
+            except Exception as e:
+                errors.append(f"{pkg_file.name}: {str(e)}")
+
+        return jsonable_encoder({
+            "total": len(pkg_files),
+            "success": len(results),
+            "failed": len(errors),
+            "results": results,
+            "errors": errors
+        })
 
 
 @console_ns.route("/workspaces/current/plugin/upload/github")

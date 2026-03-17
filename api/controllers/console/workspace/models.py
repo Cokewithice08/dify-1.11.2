@@ -14,6 +14,7 @@ from libs.helper import uuid_value
 from libs.login import current_account_with_tenant, login_required
 from services.model_load_balancing_service import ModelLoadBalancingService
 from services.model_provider_service import ModelProviderService
+from services.plugin.plugin_service import PluginService
 
 logger = logging.getLogger(__name__)
 DEFAULT_REF_TEMPLATE_SWAGGER_2_0 = "#/definitions/{model}"
@@ -247,6 +248,19 @@ class ModelProviderModelApi(Resource):
 
         return {"result": "success"}, 204
 
+@console_ns.route("/workspaces/current/model-providers/models/credentials/load")
+class ModelProviderModelCredentialLoadApi(Resource):
+    @setup_required
+    @login_required
+    @is_admin_or_owner_required
+    @account_initialization_required
+    def post(self):
+        _, tenant_id = current_account_with_tenant()
+        
+        plugin_service = PluginService()
+        plugin_service.load_pkg_config_default(tenant_id=tenant_id)
+
+        return {"result": "success"}, 200
 
 @console_ns.route("/workspaces/current/model-providers/<path:provider>/models/credentials")
 class ModelProviderModelCredentialApi(Resource):
